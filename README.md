@@ -133,3 +133,4 @@ pg_restore --clean --if-exists -d "$DATABASE_URL" nusaifa-backup-2026-11-14.dump
 ## 4. bKash & Nagad Payment Gateway Integration
 
 The platform includes an integration-ready payment configuration layer (`GET /api/payments/gateways` and Admin **Delivery & Pay** settings). Cash on Delivery (COD) is active immediately across all 64 districts. To activate live bKash or Nagad checkout, configure your merchant API credentials (`BKASH_APP_KEY`, `BKASH_APP_SECRET`, `NAGAD_MERCHANT_ID`, `NAGAD_MERCHANT_PRIVATE_KEY`) in `.env` and enable the corresponding gateway toggle in the Admin Dashboard.
+# nusaifa-spices
