@@ -1,0 +1,6 @@
+{
+  "name": "NUSAIFA SPICES",
+  "description": "NUSAIFA SPICES — Complete bilingual e-commerce platform and admin dashboard for natural spices, organic food, herbal products, and superfoods in Bangladesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+data/nusaifa-db.json
+uploads/
+*.log
+*.bak
+*.backup
+*.tsbuildinfo
+data/
+.env.example
+docker-compose.yml

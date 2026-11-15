@@ -1,0 +1,100 @@
+import type { Language, OrderStatus } from '../shared/types.ts';
+
+export function formatBdt(amount: number): string {
+  const formatted = new Intl.NumberFormat('en-BD', {
+    maximumFractionDigits: 0,
+  }).format(Math.round(amount));
+  return `৳${formatted}`;
+}
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, { en: string; bn: string; tone: string }> = {
+  pending: { en: 'Pending', bn: 'অপেক্ষমাণ', tone: 'text-amber-700 bg-amber-50 border-amber-200' },
+  confirmed: { en: 'Confirmed', bn: 'নিশ্চিত', tone: 'text-[#075B42] bg-emerald-50 border-emerald-200' },
+  processing: { en: 'Packing', bn: 'প্যাকিং চলছে', tone: 'text-sky-700 bg-sky-50 border-sky-200' },
+  shipped: { en: 'Shipped', bn: 'পাঠানো হয়েছে', tone: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+  delivered: { en: 'Delivered', bn: 'ডেলিভারি সম্পন্ন', tone: 'text-emerald-800 bg-emerald-50 border-emerald-300' },
+  cancelled: { en: 'Cancelled', bn: 'বাতিল', tone: 'text-rose-700 bg-rose-50 border-rose-200' },
+};
+
+export const UI_COPY = {
+  en: {
+    navShop: 'Shop',
+    navTrack: 'Track Order',
+    navAbout: 'About',
+    navContact: 'Contact',
+    navAccount: 'Account',
+    bag: 'Bag',
+    allCategories: 'All Products',
+    searchPlaceholder: 'Search spices, honey, moringa...',
+    sortFeatured: 'Featured',
+    sortPriceLow: 'Price: Low to High',
+    sortPriceHigh: 'Price: High to Low',
+    addToBag: 'Add to Bag',
+    added: 'Added',
+    outOfStock: 'Out of Stock',
+    inStock: 'In Stock',
+    viewDetails: 'Details',
+    checkout: 'Proceed to Checkout',
+    emptyBagTitle: 'Your spice bag is empty',
+    emptyBagDesc: 'Explore single-origin spices, raw Sundarbans honey, and herbal oils.',
+    subtotal: 'Subtotal',
+    deliveryCharge: 'Delivery Charge',
+    freeDelivery: 'Free',
+    total: 'Total',
+    codTitle: 'Cash on Delivery (COD)',
+    codDesc: 'Order first, pay in cash upon inspecting your parcel at delivery.',
+    placeOrder: 'Confirm Order',
+    backToShop: 'Back to Shop',
+    origin: 'Origin',
+    weight: 'Net Weight',
+    sku: 'SKU',
+    quantity: 'Quantity',
+    orderHistory: 'Order History',
+    signIn: 'Sign In',
+    createAccount: 'Create Account',
+    signOut: 'Sign Out',
+    adminPortal: 'Admin Portal',
+  },
+  bn: {
+    navShop: 'শপ',
+    navTrack: 'অর্ডার ট্র্যাক',
+    navAbout: 'আমাদের সম্পর্কে',
+    navContact: 'যোগাযোগ',
+    navAccount: 'অ্যাকাউন্ট',
+    bag: 'ব্যাগ',
+    allCategories: 'সকল পণ্য',
+    searchPlaceholder: 'মসলা, মধু, কালোজিরা খুঁজুন...',
+    sortFeatured: 'বিশেষ সংগ্রহ',
+    sortPriceLow: 'মূল্য: কম থেকে বেশি',
+    sortPriceHigh: 'মূল্য: বেশি থেকে কম',
+    addToBag: 'ব্যাগে যোগ করুন',
+    added: 'যোগ হয়েছে',
+    outOfStock: 'স্টক শেষ',
+    inStock: 'স্টকে আছে',
+    viewDetails: 'বিস্তারিত',
+    checkout: 'অর্ডার সম্পন্ন করুন',
+    emptyBagTitle: 'আপনার ব্যাগটি খালি',
+    emptyBagDesc: 'খাঁটি দেশি মসলা, সুন্দরবনের মধু ও ভেষজ পণ্য সংগ্রহ করুন।',
+    subtotal: 'সাবটোটাল',
+    deliveryCharge: 'ডেলিভারি চার্জ',
+    freeDelivery: 'ফ্রি',
+    total: 'সর্বমোট',
+    codTitle: 'ক্যাশ অন ডেলিভারি (COD)',
+    codDesc: 'আগে অর্ডার করুন, পণ্য হাতে পেয়ে মূল্য পরিশোধ করুন।',
+    placeOrder: 'অর্ডার নিশ্চিত করুন',
+    backToShop: 'শপে ফিরে যান',
+    origin: 'উৎস',
+    weight: 'পরিমাণ',
+    sku: 'কোড',
+    quantity: 'সংখ্যা',
+    orderHistory: 'অর্ডারের ইতিহাস',
+    signIn: 'সাইন ইন',
+    createAccount: 'নতুন অ্যাকাউন্ট',
+    signOut: 'সাইন আউট',
+    adminPortal: 'অ্যাডমিন প্যানেল',
+  },
+} as const;
+
+export function t(lang: Language, key: keyof typeof UI_COPY.en): string {
+  return UI_COPY[lang][key];
+}
