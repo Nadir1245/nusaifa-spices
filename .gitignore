@@ -12,3 +12,4 @@ uploads/
 data/
 .env.example
 docker-compose.yml
+*.before-*
