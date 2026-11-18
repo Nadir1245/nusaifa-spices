@@ -804,22 +804,11 @@ export const EditorialContentPage: React.FC<{
 
       {pageKey === 'contact' && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pt-4">
-          <div className="md:col-span-5 space-y-4">
-            <div className="p-5 rounded-xl bg-[#F8F6F1] border border-[#E5E0D5] space-y-3 text-sm">
-              <div className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-[#075B42] mt-1 shrink-0" />
-                <span>House 24, Road 7, Dhanmondi, Dhaka 1205, Bangladesh</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-4 h-4 text-[#075B42] shrink-0" />
-                <span className="font-mono-tabular">+880 1700-000000</span>
-              </div>
-            </div>
-          </div>
+
 
           <form
             onSubmit={handleContactSubmit}
-            className="md:col-span-7 bg-white border border-[#E5E0D5] rounded-xl p-6 space-y-4"
+            className="md:col-span-12 bg-white border border-[#E5E0D5] rounded-xl p-6 space-y-4"
           >
             <h2 className="text-xl font-semibold text-[#141A17]">
               {lang === 'bn' ? 'বার্তা পাঠান' : 'Send an Inquiry'}

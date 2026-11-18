@@ -64,6 +64,15 @@ export const productSchema = z.object({
   galleryUrls: z.array(z.string().trim().max(1000)).optional().default([]),
   isFeatured: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
+
+  // SEO metadata
+  seoTitleEn: z.string().trim().max(200).optional().default(''),
+  seoTitleBn: z.string().trim().max(200).optional().default(''),
+  seoDescriptionEn: z.string().trim().max(320).optional().default(''),
+  seoDescriptionBn: z.string().trim().max(320).optional().default(''),
+  focusKeywords: z.string().trim().max(500).optional().default(''),
+  imageAltEn: z.string().trim().max(250).optional().default(''),
+  imageAltBn: z.string().trim().max(250).optional().default(''),
 });
 
 export const categorySchema = z.object({

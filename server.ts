@@ -30,6 +30,7 @@ import {
   updateOrderStatusSchema,
 } from './src/server/validation.ts';
 import type { OrderStatus } from './src/shared/types.ts';
+import { isRegisteredPlugin } from './src/shared/pluginRegistry.ts';
 
 dotenv.config();
 
@@ -564,7 +565,79 @@ async function bootstrapServer() {
     }
   });
 
-  app.put('/api/admin/site-content', requireAdmin, async (req, res) => {
+  // ==================== PLUGIN CENTER API ====================
+
+app.get('/api/admin/plugins', requireAdmin, async (_req, res) => {
+  try {
+    res.json(await storage.listPluginIntegrations());
+  } catch {
+    res.status(503).json({
+      error: 'Plugin Center database migration is not installed yet.',
+    });
+  }
+});
+
+app.put('/api/admin/plugins/:pluginKey', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const pluginKey = String(req.params.pluginKey || '');
+  if (!/^[a-z0-9-]{2,80}$/.test(pluginKey)) {
+    res.status(400).json({ error: 'Invalid plugin key.' });
+    return;
+  }
+
+  if (!isRegisteredPlugin(pluginKey)) {
+    res.status(404).json({ error: 'Plugin is not registered.' });
+    return;
+  }
+
+  const body = req.body || {};
+  if (
+    (body.enabled !== undefined && typeof body.enabled !== 'boolean') ||
+    (body.settings !== undefined &&
+      (typeof body.settings !== 'object' || body.settings === null || Array.isArray(body.settings)))
+  ) {
+    res.status(400).json({ error: 'Invalid plugin settings.' });
+    return;
+  }
+
+  const settings = body.settings as Record<string, unknown> | undefined;
+  const forbidden = settings
+    ? Object.keys(settings).some((key) =>
+        /secret|password|token|api.?key|private.?key/i.test(key)
+      )
+    : false;
+
+  if (forbidden) {
+    res.status(400).json({
+      error: 'Credentials cannot be stored in Plugin Center settings.',
+    });
+    return;
+  }
+
+  try {
+    const updated = await storage.updatePluginIntegration(
+      pluginKey,
+      { enabled: body.enabled, settings },
+      req.authUser?.sub || null
+    );
+    res.json(updated);
+  } catch {
+    res.status(503).json({
+      error: 'Plugin Center database migration is not installed yet.',
+    });
+  }
+});
+
+app.get('/api/admin/plugins/activity', requireAdmin, async (_req, res) => {
+  try {
+    res.json(await storage.listPluginActivityLogs(100));
+  } catch {
+    res.status(503).json({
+      error: 'Plugin Center database migration is not installed yet.',
+    });
+  }
+});
+
+app.put('/api/admin/site-content', requireAdmin, async (req, res) => {
     const parsed = siteContentUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid site content payload.' });

@@ -101,12 +101,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
   const primaryBanner = banners[0] || {
     id: 'fallback',
-    titleEn: 'Single-Origin Bangladeshi Harvest',
-    titleBn: 'বাংলাদেশের প্রান্তিক মাঠের খাঁটি ফসল',
+    titleEn: 'Quality Products from Trusted Brands',
+    titleBn: 'বিশ্বস্ত ব্র্যান্ডের মানসম্মত পণ্য',
     subtitleEn:
-      'Stone-milled spices, raw Sundarbans honey, and cold-pressed herbal oils delivered nationwide.',
+      'Explore sealed spices and natural food products in their original manufacturer packaging.',
     subtitleBn:
-      'পাথরে ভাঙা খাঁটি মসলা, সুন্দরবনের প্রাকৃতিক মধু ও ভেষজ তেল সারা বাংলাদেশে হোম ডেলিভারি।',
+      'মূল প্রস্তুতকারকের সিল ও লেবেল অক্ষুণ্ণ থাকা মসলা ও প্রাকৃতিক খাদ্যপণ্য ঘরে বসেই অর্ডার করুন।',
     ctaLabelEn: 'Shop Collection',
     ctaLabelBn: 'পণ্যসমূহ দেখুন',
     targetCategorySlug: 'all',
@@ -190,15 +190,19 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       )}
 
       {/* Clean 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[#E5E0D5]">
+      <header className="sticky top-0 z-30 bg-[#F8F6EC]/95 backdrop-blur-md border-b border-[#C9A646] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
           {/* Zone 1: Single-element wordmark */}
           <button
             type="button"
             onClick={() => goRoute('home')}
-            className="font-display text-2xl font-bold tracking-tight text-[#075B42] whitespace-nowrap shrink-0"
+            className="flex items-center shrink-0"
           >
-            NUSAIFA SPICES
+            <img
+              src="/nusaifa-logo.png"
+              alt="NUSAIFA SPICES"
+              className="h-12 w-auto max-w-[180px] object-contain"
+            />
           </button>
 
           {/* Zone 2: 5 concise single-line nav links */}
@@ -380,11 +384,11 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-semibold text-[#141A17]">
-                    {lang === 'bn' ? 'আমাদের খাঁটি সংগ্রহ' : 'Curated Harvest Catalog'}
+                    {lang === 'bn' ? 'আমাদের নির্বাচিত পণ্যসমূহ' : 'Our Selected Collection'}
                   </h2>
                   <p className="mt-1.5 text-sm text-[#59645F]">
                     {lang === 'bn'
-                      ? 'প্রতিটি পণ্য নিজস্ব ব্যাচে পরীক্ষিত এবং ক্যাশ অন ডেলিভারিতে উপলব্ধ'
+                      ? 'বিশ্বস্ত প্রস্তুতকারকের মূল সিল ও প্যাকেটে মসলা ও প্রাকৃতিক খাদ্যপণ্য অর্ডার করুন।'
                       : 'Small-batch botanicals priced in BDT (৳) with nationwide Cash on Delivery'}
                   </p>
                 </div>
@@ -483,15 +487,15 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold tracking-widest uppercase text-[#D4AF37]">
-                    {lang === 'bn' ? 'সরাসরি উৎস' : 'Single-Origin Traceability'}
+                    {lang === 'bn' ? 'বিশ্বস্ত ব্র্যান্ড' : 'Trusted Brands'}
                   </p>
                   <h3 className="text-xl font-semibold">
-                    {lang === 'bn' ? 'কৃষক থেকে সরাসরি সংগ্রহ' : 'Bogura, Satkhira & Rajshahi'}
+                    {lang === 'bn' ? 'প্রস্তুতকারকের মূল প্যাকেট' : 'Original Manufacturer Packaging'}
                   </h3>
                   <p className="text-sm text-white/80 leading-relaxed">
                     {lang === 'bn'
-                      ? 'কোনো কৃত্রিম রঙ বা প্রিজারভেটিভ ছাড়া প্রাকৃতিক রোদে শুকানো ও পাথরের ঘানিতে ভাঙা।'
-                      : 'Sun-dried harvests milled in small lots with zero synthetic colors or fillers.'}
+                      ? 'পণ্যের মূল লেবেল, উপাদান ও প্রস্তুতকারকের তথ্য অক্ষুণ্ণ রাখা হয়।'
+                      : 'Original product labels and manufacturer information remain intact.'}
                   </p>
                 </div>
 
@@ -511,15 +515,15 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
                 <div className="space-y-2">
                   <p className="text-xs font-semibold tracking-widest uppercase text-[#D4AF37]">
-                    {lang === 'bn' ? 'মানের নিশ্চয়তা' : 'Purity Guarantee'}
+                    {lang === 'bn' ? 'পণ্যের তথ্য' : 'Product Information'}
                   </p>
                   <h3 className="text-xl font-semibold">
-                    {lang === 'bn' ? '৪৮ ঘণ্টার সহজ রিটার্ন' : '48-Hour Inspection & Return'}
+                    {lang === 'bn' ? 'লেবেল দেখে পণ্য যাচাই করুন' : 'Check Original Product Labels'}
                   </h3>
                   <p className="text-sm text-white/80 leading-relaxed">
                     {lang === 'bn'
-                      ? 'প্যাকেজিং বা পণ্যের মানে কোনো অসঙ্গতি থাকলে ৪৮ ঘণ্টার মধ্যে পরিবর্তন বা রিফান্ড।'
-                      : 'Tamper-evident jars and pouches backed by prompt replacement if compromised.'}
+                      ? 'উপাদান, প্রস্তুতকারক, ব্যাচ নম্বর ও মেয়াদ মূল প্যাকেটের লেবেলে দেখুন।'
+                      : 'Check ingredients, manufacturer details, batch number and expiry on the original label.'}
                   </p>
                 </div>
               </div>
@@ -799,7 +803,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         </div>
         <div className="border-t border-[#E5E0D5] py-4 px-4 sm:px-6 max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs text-[#59645F]">
           <span>© {new Date().getFullYear()} NUSAIFA SPICES. All rights reserved.</span>
-          <span>Dhanmondi, Dhaka 1205, Bangladesh</span>
+          <span>Mirwarispur, Begumganj, Chowmuhani, Noakhali 3823, Bangladesh</span>
         </div>
       </footer>
     </div>

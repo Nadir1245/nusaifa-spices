@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -35,6 +36,25 @@ export interface UserRecord extends UserPublic {
   passwordHash: string;
 }
 
+export interface PluginIntegrationRecord {
+  pluginKey: string;
+  enabled: boolean;
+  status: 'available' | 'connected' | 'disconnected' | 'error' | 'planned';
+  settings: Record<string, unknown>;
+  lastError: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PluginActivityLogRecord {
+  id: number;
+  pluginKey: string;
+  action: string;
+  details: Record<string, unknown>;
+  actorUserId: string | null;
+  createdAt: string;
+}
+
 export interface DatabaseSnapshot {
   version: number;
   exportedAt: string;
@@ -46,6 +66,8 @@ export interface DatabaseSnapshot {
   banners: PromotionalBanner[];
   siteContent: SiteContentItem[];
   contactMessages: ContactMessage[];
+  pluginIntegrations?: PluginIntegrationRecord[];
+  pluginActivityLogs?: PluginActivityLogRecord[];
 }
 
 export interface CreateOrderInput {
@@ -169,7 +191,16 @@ class StorageEngine {
     await fs.mkdir(path.dirname(this.dataFilePath), { recursive: true });
     try {
       const raw = await fs.readFile(this.dataFilePath, 'utf-8');
-      this.state = JSON.parse(raw) as DatabaseSnapshot;
+      const parsed = JSON.parse(raw) as DatabaseSnapshot;
+      this.state = {
+        ...parsed,
+        pluginIntegrations: Array.isArray(parsed.pluginIntegrations)
+          ? parsed.pluginIntegrations
+          : [],
+        pluginActivityLogs: Array.isArray(parsed.pluginActivityLogs)
+          ? parsed.pluginActivityLogs
+          : [],
+      };
     } catch {
       const adminEmail = (process.env.ADMIN_EMAIL || 'admin@nusaifaspices.com').toLowerCase();
       const adminPass = process.env.ADMIN_PASSWORD;
@@ -216,6 +247,8 @@ class StorageEngine {
         banners: structuredClone(INITIAL_BANNERS),
         siteContent: structuredClone(INITIAL_SITE_CONTENT),
         contactMessages: [],
+        pluginIntegrations: [],
+        pluginActivityLogs: [],
       };
       await this.persistFileState();
     }
@@ -592,8 +625,10 @@ class StorageEngine {
         `INSERT INTO products (
           category_id, sku, slug, name_en, name_bn, short_desc_en, short_desc_bn,
           description_en, description_bn, origin_en, origin_bn, weight_label,
-          price_bdt, discount_price_bdt, stock_qty, image_url, gallery_urls, is_featured, is_active
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19)
+          price_bdt, discount_price_bdt, stock_qty, image_url, gallery_urls, is_featured, is_active,
+          seo_title_en, seo_title_bn, seo_description_en, seo_description_bn,
+          focus_keywords, image_alt_en, image_alt_bn
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,$21,$22,$23,$24,$25,$26)
         RETURNING *`,
         [
           data.categoryId,
@@ -615,6 +650,13 @@ class StorageEngine {
           JSON.stringify(data.galleryUrls || []),
           data.isFeatured,
           data.isActive,
+          data.seoTitleEn ?? '',
+          data.seoTitleBn ?? '',
+          data.seoDescriptionEn ?? '',
+          data.seoDescriptionBn ?? '',
+          data.focusKeywords ?? '',
+          data.imageAltEn ?? '',
+          data.imageAltBn ?? '',
         ]
       );
       return this.mapPgProduct(rows[0]);
@@ -663,6 +705,13 @@ class StorageEngine {
              gallery_urls = COALESCE($18::jsonb, gallery_urls),
              is_featured = COALESCE($19, is_featured),
              is_active = COALESCE($20, is_active),
+             seo_title_en = COALESCE($21, seo_title_en),
+             seo_title_bn = COALESCE($22, seo_title_bn),
+             seo_description_en = COALESCE($23, seo_description_en),
+             seo_description_bn = COALESCE($24, seo_description_bn),
+             focus_keywords = COALESCE($25, focus_keywords),
+             image_alt_en = COALESCE($26, image_alt_en),
+             image_alt_bn = COALESCE($27, image_alt_bn),
              updated_at = NOW()
          WHERE id = $1
          RETURNING *`,
@@ -687,6 +736,13 @@ class StorageEngine {
           data.galleryUrls ? JSON.stringify(data.galleryUrls) : null,
           data.isFeatured ?? null,
           data.isActive ?? null,
+          data.seoTitleEn ?? null,
+          data.seoTitleBn ?? null,
+          data.seoDescriptionEn ?? null,
+          data.seoDescriptionBn ?? null,
+          data.focusKeywords ?? null,
+          data.imageAltEn ?? null,
+          data.imageAltBn ?? null,
         ]
       );
       return rows[0] ? this.mapPgProduct(rows[0]) : null;
@@ -1446,6 +1502,22 @@ class StorageEngine {
         this.listContactMessages(),
       ]);
     const { rows: userRows } = await this.pgPool.query('SELECT * FROM users');
+    let pluginIntegrations: PluginIntegrationRecord[] = [];
+    let pluginActivityLogs: PluginActivityLogRecord[] = [];
+
+    const pluginTables = await this.pgPool.query(
+      `SELECT
+        to_regclass('public.plugin_integrations') IS NOT NULL AS integrations_exists,
+        to_regclass('public.plugin_activity_logs') IS NOT NULL AS logs_exists`
+    );
+
+    if (pluginTables.rows[0]?.integrations_exists && pluginTables.rows[0]?.logs_exists) {
+      [pluginIntegrations, pluginActivityLogs] = await Promise.all([
+        this.listPluginIntegrations(),
+        this.listPluginActivityLogs(500),
+      ]);
+    }
+
 
     return {
       version: 1,
@@ -1458,6 +1530,8 @@ class StorageEngine {
       banners,
       siteContent,
       contactMessages,
+      pluginIntegrations,
+      pluginActivityLogs,
     };
   }
 
@@ -1478,6 +1552,12 @@ class StorageEngine {
         banners: Array.isArray(snapshot.banners) ? snapshot.banners : [],
         siteContent: Array.isArray(snapshot.siteContent) ? snapshot.siteContent : [],
         contactMessages: Array.isArray(snapshot.contactMessages) ? snapshot.contactMessages : [],
+        pluginIntegrations: Array.isArray(snapshot.pluginIntegrations)
+          ? snapshot.pluginIntegrations
+          : (this.state!.pluginIntegrations || []),
+        pluginActivityLogs: Array.isArray(snapshot.pluginActivityLogs)
+          ? snapshot.pluginActivityLogs
+          : (this.state!.pluginActivityLogs || []),
       };
       await this.persistFileState();
       return;
@@ -1526,6 +1606,72 @@ class StorageEngine {
           [s.key, s.valueEn, s.valueBn]
         );
       }
+
+      // Older backups omit plugin arrays; keep current Plugin Center data.
+      if (
+        Array.isArray(snapshot.pluginIntegrations) &&
+        Array.isArray(snapshot.pluginActivityLogs)
+      ) {
+        const pluginTables = await client.query(
+          `SELECT
+            to_regclass('public.plugin_integrations') IS NOT NULL AS integrations_exists,
+            to_regclass('public.plugin_activity_logs') IS NOT NULL AS logs_exists`
+        );
+
+        if (
+          !pluginTables.rows[0]?.integrations_exists ||
+          !pluginTables.rows[0]?.logs_exists
+        ) {
+          throw new Error(
+            'Plugin Center tables are not installed. Apply the approved migration before restoring this backup.'
+          );
+        }
+
+        await client.query('DELETE FROM plugin_activity_logs');
+        await client.query('DELETE FROM plugin_integrations');
+
+        for (const item of snapshot.pluginIntegrations) {
+          await client.query(
+            `INSERT INTO plugin_integrations
+              (plugin_key, enabled, status, settings, last_error, created_at, updated_at)
+             VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7)`,
+            [
+              item.pluginKey,
+              item.enabled,
+              item.status,
+              JSON.stringify(item.settings || {}),
+              item.lastError || '',
+              item.createdAt,
+              item.updatedAt,
+            ]
+          );
+        }
+
+        for (const item of snapshot.pluginActivityLogs) {
+          await client.query(
+            `INSERT INTO plugin_activity_logs
+              (id, plugin_key, action, details, actor_user_id, created_at)
+             VALUES ($1,$2,$3,$4::jsonb,$5,$6)`,
+            [
+              item.id,
+              item.pluginKey,
+              item.action,
+              JSON.stringify(item.details || {}),
+              item.actorUserId,
+              item.createdAt,
+            ]
+          );
+        }
+
+        await client.query(
+          `SELECT setval(
+            pg_get_serial_sequence('plugin_activity_logs', 'id'),
+            COALESCE((SELECT MAX(id) FROM plugin_activity_logs), 1),
+            EXISTS (SELECT 1 FROM plugin_activity_logs)
+          )`
+        );
+      }
+
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -1567,6 +1713,165 @@ class StorageEngine {
     };
   }
 
+
+  // ==================== PLUGIN CENTER ====================
+
+  async listPluginIntegrations(): Promise<PluginIntegrationRecord[]> {
+    await this.ensureInitialized();
+
+    if (this.pgPool) {
+      const { rows } = await this.pgPool.query(
+        'SELECT * FROM plugin_integrations ORDER BY plugin_key ASC'
+      );
+      return rows.map((r) => ({
+        pluginKey: r.plugin_key,
+        enabled: Boolean(r.enabled),
+        status: r.status,
+        settings: r.settings || {},
+        lastError: r.last_error || '',
+        createdAt: new Date(r.created_at).toISOString(),
+        updatedAt: new Date(r.updated_at).toISOString(),
+      }));
+    }
+
+    const st = await this.getFileState();
+    return st.pluginIntegrations || [];
+  }
+
+  async updatePluginIntegration(
+    pluginKey: string,
+    input: { enabled?: boolean; settings?: Record<string, unknown> },
+    actorUserId: string | null
+  ): Promise<PluginIntegrationRecord> {
+    await this.ensureInitialized();
+    const now = new Date().toISOString();
+
+    if (this.pgPool) {
+      const existing = await this.pgPool.query(
+        'SELECT * FROM plugin_integrations WHERE plugin_key = $1',
+        [pluginKey]
+      );
+      const previous = existing.rows[0];
+      const enabled = input.enabled ?? Boolean(previous?.enabled);
+      const settings = {
+        ...(previous?.settings || {}),
+        ...(input.settings || {}),
+      };
+      const status = previous?.status === 'planned'
+        ? 'planned'
+        : enabled ? 'available' : 'disconnected';
+
+      const { rows } = await this.pgPool.query(
+        `INSERT INTO plugin_integrations
+          (plugin_key, enabled, status, settings, last_error)
+         VALUES ($1, $2, $3, $4::jsonb, '')
+         ON CONFLICT (plugin_key) DO UPDATE SET
+          enabled = EXCLUDED.enabled,
+          status = EXCLUDED.status,
+          settings = EXCLUDED.settings,
+          updated_at = NOW()
+         RETURNING *`,
+        [pluginKey, enabled, status, JSON.stringify(settings)]
+      );
+
+      await this.pgPool.query(
+        `INSERT INTO plugin_activity_logs
+          (plugin_key, action, details, actor_user_id)
+         VALUES ($1, $2, $3::jsonb, $4)`,
+        [
+          pluginKey,
+          input.enabled === undefined ? 'settings_updated' : (enabled ? 'enabled' : 'disabled'),
+          JSON.stringify({ enabled, settingsUpdated: Boolean(input.settings) }),
+          actorUserId,
+        ]
+      );
+
+      const r = rows[0];
+      return {
+        pluginKey: r.plugin_key,
+        enabled: Boolean(r.enabled),
+        status: r.status,
+        settings: r.settings || {},
+        lastError: r.last_error || '',
+        createdAt: new Date(r.created_at).toISOString(),
+        updatedAt: new Date(r.updated_at).toISOString(),
+      };
+    }
+
+    const st = await this.getFileState();
+    if (!Array.isArray(st.pluginIntegrations)) st.pluginIntegrations = [];
+    if (!Array.isArray(st.pluginActivityLogs)) st.pluginActivityLogs = [];
+
+    let record = st.pluginIntegrations.find((item) => item.pluginKey === pluginKey);
+    const isNew = !record;
+
+    if (!record) {
+      record = {
+        pluginKey,
+        enabled: false,
+        status: 'disconnected',
+        settings: {},
+        lastError: '',
+        createdAt: now,
+        updatedAt: now,
+      };
+      st.pluginIntegrations.push(record);
+    }
+
+    if (input.enabled !== undefined) record.enabled = input.enabled;
+    if (input.settings) record.settings = { ...record.settings, ...input.settings };
+    if (record.status !== 'planned') {
+      record.status = record.enabled ? 'available' : 'disconnected';
+    }
+    record.updatedAt = now;
+
+    const nextId = st.pluginActivityLogs.reduce(
+      (max, item) => Math.max(max, item.id), 0
+    ) + 1;
+
+    st.pluginActivityLogs.unshift({
+      id: nextId,
+      pluginKey,
+      action: input.enabled === undefined
+        ? 'settings_updated'
+        : (record.enabled ? 'enabled' : 'disabled'),
+      details: {
+        enabled: record.enabled,
+        settingsUpdated: Boolean(input.settings),
+        created: isNew,
+      },
+      actorUserId,
+      createdAt: now,
+    });
+
+    await this.persistFileState();
+    return record;
+  }
+
+  async listPluginActivityLogs(limit = 100): Promise<PluginActivityLogRecord[]> {
+    await this.ensureInitialized();
+    const safeLimit = Math.max(1, Math.min(500, Math.floor(limit)));
+
+    if (this.pgPool) {
+      const { rows } = await this.pgPool.query(
+        `SELECT * FROM plugin_activity_logs
+         ORDER BY created_at DESC LIMIT $1`,
+        [safeLimit]
+      );
+      return rows.map((r) => ({
+        id: Number(r.id),
+        pluginKey: r.plugin_key,
+        action: r.action,
+        details: r.details || {},
+        actorUserId: r.actor_user_id,
+        createdAt: new Date(r.created_at).toISOString(),
+      }));
+    }
+
+    const st = await this.getFileState();
+    return (st.pluginActivityLogs || []).slice(0, safeLimit);
+  }
+
   private mapPgProduct(r: Record<string, any>): Product {
     return {
       id: r.id,
@@ -1589,6 +1894,13 @@ class StorageEngine {
       galleryUrls: Array.isArray(r.gallery_urls) ? r.gallery_urls : [],
       isFeatured: Boolean(r.is_featured),
       isActive: Boolean(r.is_active),
+      seoTitleEn: r.seo_title_en || '',
+      seoTitleBn: r.seo_title_bn || '',
+      seoDescriptionEn: r.seo_description_en || '',
+      seoDescriptionBn: r.seo_description_bn || '',
+      focusKeywords: r.focus_keywords || '',
+      imageAltEn: r.image_alt_en || '',
+      imageAltBn: r.image_alt_bn || '',
       createdAt: new Date(r.created_at).toISOString(),
       updatedAt: new Date(r.updated_at).toISOString(),
     };

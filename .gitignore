@@ -13,3 +13,10 @@ data/
 .env.example
 docker-compose.yml
 *.before-*
+
+# Temporary and backup files
+data-temp/
+*.bak*
+*.before-*
+*.division-backup
+main

@@ -326,9 +326,9 @@ export const INITIAL_SITE_CONTENT: SiteContentItem[] = [
   {
     key: 'contact_info',
     valueEn:
-      'House 24, Road 7, Dhanmondi, Dhaka 1205, Bangladesh · Hotline: +880 1700-000000 (9 AM – 9 PM) · Email: care@nusaifaspices.com',
+      'Mirwarispur, Begumganj, Chowmuhani, Noakhali 3823, Bangladesh · Phone: +8801863581745 · Email: nasir17sa@gmail.com',
     valueBn:
-      'বাড়ি ২৪, রোড ৭, ধানমন্ডি, ঢাকা ১২০৫, বাংলাদেশ · হটলাইন: +৮৮০ ১৭০০-০০০০০০ (সকাল ৯টা – রাত ৯টা) · ইমেইল: care@nusaifaspices.com',
+      'মিরওয়ারিশপুর, বেগমগঞ্জ, চৌমুহনী, নোয়াখালী 3823, বাংলাদেশ · ফোন: +8801863581745 · ইমেইল: nasir17sa@gmail.com',
     updatedAt: nowIso(),
   },
   {

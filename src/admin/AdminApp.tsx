@@ -12,6 +12,7 @@ import {
   LogOut,
   MessageSquare,
   Package,
+  Puzzle,
   Plus,
   ShoppingCart,
   Trash2,
@@ -32,9 +33,12 @@ import type {
   PromotionalBanner,
   SiteContentItem,
   UserPublic,
+  PluginIntegration,
+  PluginActivityLog,
 } from '../shared/types.ts';
 import { api } from '../lib/api.ts';
 import { formatBdt, ORDER_STATUS_LABELS } from '../lib/i18n.ts';
+import { PLUGIN_REGISTRY } from '../shared/pluginRegistry.ts';
 
 type AdminTab =
   | 'overview'
@@ -44,6 +48,8 @@ type AdminTab =
   | 'customers'
   | 'delivery'
   | 'cms'
+  | 'plugins'
+  | 'seo'
   | 'reports';
 
 interface AdminAppProps {
@@ -76,6 +82,12 @@ export const AdminApp: React.FC<AdminAppProps> = ({
   const [delivery, setDelivery] = useState<DeliverySettings | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [pluginIntegrations, setPluginIntegrations] = useState<PluginIntegration[]>([]);
+  const [pluginActivity, setPluginActivity] = useState<PluginActivityLog[]>([]);
+  const [pluginActivityError, setPluginActivityError] = useState('');
+  const [pluginLoading, setPluginLoading] = useState(false);
+  const [pluginError, setPluginError] = useState('');
+  const [pluginSaving, setPluginSaving] = useState<string | null>(null);
 
   // Product modal state
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -99,6 +111,13 @@ export const AdminApp: React.FC<AdminAppProps> = ({
     imageUrl: '/src/assets/images/product_turmeric_powder_1794680615609.jpg',
     isFeatured: true,
     isActive: true,
+    seoTitleEn: '',
+    seoTitleBn: '',
+    seoDescriptionEn: '',
+    seoDescriptionBn: '',
+    focusKeywords: '',
+    imageAltEn: '',
+    imageAltBn: '',
   });
 
   // Order filter & modal
@@ -163,6 +182,32 @@ export const AdminApp: React.FC<AdminAppProps> = ({
     if (isAdmin) {
       loadAllAdminData();
     }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setPluginLoading(true);
+    api.adminListPluginIntegrations()
+      .then((items) => {
+        setPluginIntegrations(items);
+        setPluginError('');
+      })
+      .catch(() => {
+        setPluginError('Plugin storage is not ready yet. Complete the approved database migration first.');
+      })
+      .finally(() => setPluginLoading(false));
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.adminListPluginActivity()
+      .then((items) => {
+        setPluginActivity(items);
+        setPluginActivityError('');
+      })
+      .catch((err: any) => {
+        setPluginActivityError(err.message || 'Activity log could not be loaded.');
+      });
   }, [isAdmin]);
 
   const notify = (msg: string) => {
@@ -233,6 +278,13 @@ export const AdminApp: React.FC<AdminAppProps> = ({
       imageUrl: '/src/assets/images/product_turmeric_powder_1794680615609.jpg',
       isFeatured: false,
       isActive: true,
+      seoTitleEn: '',
+      seoTitleBn: '',
+      seoDescriptionEn: '',
+      seoDescriptionBn: '',
+      focusKeywords: '',
+      imageAltEn: '',
+      imageAltBn: '',
     });
     setProductModalOpen(true);
   };
@@ -258,6 +310,13 @@ export const AdminApp: React.FC<AdminAppProps> = ({
       imageUrl: p.imageUrl,
       isFeatured: p.isFeatured,
       isActive: p.isActive,
+      seoTitleEn: p.seoTitleEn || '',
+      seoTitleBn: p.seoTitleBn || '',
+      seoDescriptionEn: p.seoDescriptionEn || '',
+      seoDescriptionBn: p.seoDescriptionBn || '',
+      focusKeywords: p.focusKeywords || '',
+      imageAltEn: p.imageAltEn || '',
+      imageAltBn: p.imageAltBn || '',
     });
     setProductModalOpen(true);
   };
@@ -446,6 +505,8 @@ export const AdminApp: React.FC<AdminAppProps> = ({
     { id: 'customers', label: 'Customers', icon: <Users className="w-4 h-4" /> },
     { id: 'delivery', label: 'Delivery & Pay', icon: <Truck className="w-4 h-4" /> },
     { id: 'cms', label: 'Banners & CMS', icon: <FileText className="w-4 h-4" /> },
+    { id: 'plugins', label: 'Plugin Center', icon: <Puzzle className="w-4 h-4" /> },
+    { id: 'seo', label: 'SEO Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'reports', label: 'Reports & Backup', icon: <Database className="w-4 h-4" /> },
   ];
 
@@ -650,6 +711,108 @@ export const AdminApp: React.FC<AdminAppProps> = ({
               </div>
             </div>
           )}
+
+          {/* TAB: SEO DASHBOARD */}
+          {tab === 'seo' && (() => {
+            const seoChecklist = products.map((product) => {
+              const checks = [
+                Boolean(product.seoTitleEn?.trim()),
+                Boolean(product.seoTitleBn?.trim()),
+                Boolean(product.seoDescriptionEn?.trim()),
+                Boolean(product.seoDescriptionBn?.trim()),
+                Boolean(product.focusKeywords?.trim()),
+                Boolean(product.imageAltEn?.trim()),
+                Boolean(product.imageAltBn?.trim()),
+              ];
+              return {
+                product,
+                completed: checks.filter(Boolean).length,
+                total: checks.length,
+              };
+            });
+
+            const completeCount = seoChecklist.filter((item) => item.completed === item.total).length;
+            const incompleteCount = seoChecklist.length - completeCount;
+            const completionRate = seoChecklist.length
+              ? Math.round((completeCount / seoChecklist.length) * 100)
+              : 0;
+
+            return (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-semibold text-[#141A17]">SEO Management Dashboard</h2>
+                  <p className="text-sm text-[#59645F] mt-1">
+                    Product search metadata completeness overview
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="bg-white border border-[#E5E0D5] rounded-xl p-5">
+                    <p className="text-xs text-[#59645F]">Total Products</p>
+                    <p className="text-2xl font-semibold text-[#141A17] mt-1">{products.length}</p>
+                  </div>
+                  <div className="bg-white border border-[#E5E0D5] rounded-xl p-5">
+                    <p className="text-xs text-[#59645F]">SEO Complete</p>
+                    <p className="text-2xl font-semibold text-[#075B42] mt-1">{completeCount}</p>
+                  </div>
+                  <div className="bg-white border border-[#E5E0D5] rounded-xl p-5">
+                    <p className="text-xs text-[#59645F]">Needs Attention</p>
+                    <p className="text-2xl font-semibold text-[#8E6F16] mt-1">{incompleteCount}</p>
+                  </div>
+                  <div className="bg-white border border-[#E5E0D5] rounded-xl p-5">
+                    <p className="text-xs text-[#59645F]">SEO Completion</p>
+                    <p className="text-2xl font-semibold text-[#075B42] mt-1">{completionRate}%</p>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-[#E5E0D5] rounded-xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-[#141A17]">Overall SEO Readiness</h3>
+                    <span className="text-sm font-semibold text-[#075B42]">{completionRate}%</span>
+                  </div>
+                  <div className="h-3 rounded-full bg-[#F0ECE2] overflow-hidden">
+                    <div className="h-full bg-[#075B42] rounded-full" style={{ width: `${completionRate}%` }} />
+                  </div>
+                  <p className="text-xs text-[#59645F]">
+                    A product is counted complete when all seven SEO fields are filled. This is an internal checklist, not a Google ranking score.
+                  </p>
+                </div>
+
+                <div className="bg-white border border-[#E5E0D5] rounded-xl p-5 space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-[#141A17]">Product SEO Checklist</h3>
+                    <p className="text-xs text-[#59645F] mt-1">Select a product to edit its SEO information.</p>
+                  </div>
+                  {seoChecklist.length === 0 ? (
+                    <p className="text-sm text-[#59645F]">No products found.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {seoChecklist.map((item) => (
+                        <button
+                          key={item.product.id}
+                          type="button"
+                          onClick={() => openEditProductModal(item.product)}
+                          className="w-full text-left p-3 rounded-lg border border-[#E5E0D5] hover:border-[#075B42] hover:bg-[#F8F6F1] flex items-center justify-between gap-3"
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-[#141A17] truncate">
+                              {item.product.nameEn}
+                            </span>
+                            <span className="block text-xs text-[#59645F] truncate">
+                              {item.product.nameBn}
+                            </span>
+                          </span>
+                          <span className={`shrink-0 text-xs font-semibold ${item.completed === item.total ? 'text-[#075B42]' : 'text-[#8E6F16]'}`}>
+                            {item.completed}/{item.total} fields
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* TAB: PRODUCTS */}
           {tab === 'products' && (
@@ -1351,6 +1514,171 @@ export const AdminApp: React.FC<AdminAppProps> = ({
             </div>
           )}
 
+
+          {/* TAB: PLUGIN CENTER */}
+          {tab === 'plugins' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-[#E5E0D5] rounded-xl p-5">
+                <h2 className="text-xl font-semibold text-[#141A17]">Plugin Center</h2>
+                <p className="text-sm text-[#59645F] mt-2">
+                  Manage available integrations for payments, courier, marketing and store tools.
+                </p>
+                <p className="text-xs text-[#8A6B22] mt-2">
+                  Enable means selected in your store. It does not mean the external service is connected.
+                </p>
+              </div>
+
+              {pluginLoading && <p className="text-sm">Loading plugin settings...</p>}
+              {pluginError && (
+                <div className="rounded-xl border border-[#E5D6A8] bg-[#FFF9E9] p-4 text-sm text-[#765A16]">
+                  {pluginError}
+                </div>
+              )}
+
+              {PLUGIN_REGISTRY.map((group) => (
+                <section key={group.category} className="space-y-3">
+                  <h3 className="text-sm font-bold text-[#075B42]">{group.category}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {group.plugins.map((plugin) => {
+                      const { key: pluginKey, name, description } = plugin;
+                      const integration = pluginIntegrations.find(
+                        (item) => item.pluginKey === pluginKey
+                      );
+                      const enabled = integration?.enabled ?? false;
+                      const status = integration?.status ?? 'available';
+
+                      return (
+                        <div key={pluginKey} className="bg-white border border-[#E5E0D5] rounded-xl p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h4 className="font-semibold text-sm text-[#141A17]">{name}</h4>
+                              <p className="text-xs text-[#59645F] mt-1">{description}</p>
+                            </div>
+                            <span className="text-[10px] rounded-full px-2 py-1 font-semibold bg-[#F1EFE9] text-[#59645F]">
+                              {status}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-[#E5E0D5] pt-3">
+                            <span className="text-xs text-[#59645F]">
+                              {enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={pluginSaving === pluginKey || Boolean(pluginError)}
+                              onClick={async () => {
+                                setPluginSaving(pluginKey);
+                                try {
+                                  const updated = await api.adminUpdatePlugin(pluginKey, {
+                                    enabled: !enabled,
+                                  });
+                                  setPluginIntegrations((current) => [
+                                    ...current.filter((item) => item.pluginKey !== pluginKey),
+                                    updated,
+                                  ]);
+                                  notify(`${name} ${updated.enabled ? 'enabled' : 'disabled'}.`);
+                                  api.adminListPluginActivity()
+                                    .then((items) => {
+                                      setPluginActivity(items);
+                                      setPluginActivityError('');
+                                    })
+                                    .catch(() => {
+                                      setPluginActivityError('Activity log refresh failed.');
+                                    });
+                                } catch (err: any) {
+                                  setPluginError(err.message || 'Could not update plugin.');
+                                } finally {
+                                  setPluginSaving(null);
+                                }
+                              }}
+                              className={`px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-50 ${
+                                enabled ? 'bg-[#F1EFE9] text-[#59645F]' : 'bg-[#075B42] text-white'
+                              }`}
+                            >
+                              {pluginSaving === pluginKey
+                                ? 'Saving...'
+                                : enabled ? 'Disable' : 'Enable'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+
+          {/* PLUGIN ACTIVITY LOG */}
+          {tab === 'plugins' && (
+            <section className="mt-6 bg-white border border-[#E5E0D5] rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#141A17]">Plugin Activity Log</h2>
+                  <p className="text-xs text-[#59645F] mt-1">
+                    Recent plugin changes recorded by the server
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    api.adminListPluginActivity()
+                      .then((items) => {
+                        setPluginActivity(items);
+                        setPluginActivityError('');
+                      })
+                      .catch((err: any) => {
+                        setPluginActivityError(err.message || 'Could not refresh activity log.');
+                      });
+                  }}
+                  className="px-3 py-2 rounded-lg border border-[#D6D0C4] text-xs font-semibold"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {pluginActivityError && (
+                <p className="text-xs text-[#9A5B16]">{pluginActivityError}</p>
+              )}
+
+              {pluginActivity.length === 0 ? (
+                <p className="text-sm text-[#59645F]">
+                  No plugin activity records found yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {pluginActivity.map((log) => (
+                    <div
+                      key={log.id}
+                      className="rounded-lg border border-[#E5E0D5] bg-[#F8F6F1] p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-[#075B42]">
+                          {log.pluginKey}
+                        </span>
+                        <span className="text-xs font-semibold text-[#59645F]">
+                          {log.action}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#59645F] mt-2">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </p>
+                      {log.actorUserId && (
+                        <p className="text-xs text-[#59645F] mt-1">
+                          Admin ID: {log.actorUserId}
+                        </p>
+                      )}
+                      {Object.keys(log.details || {}).length > 0 && (
+                        <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-[#59645F]">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* TAB: REPORTS & BACKUP */}
           {tab === 'reports' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1575,6 +1903,45 @@ export const AdminApp: React.FC<AdminAppProps> = ({
                     onChange={(e) => setProdForm({ ...prodForm, descriptionBn: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]"
                   />
+                </div>
+              </div>
+
+              <div className="border border-[#D6D0C4] rounded-xl p-4 space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-[#075B42]">SEO Management</h3>
+                  <p className="text-xs text-[#59645F]">Search engine titles, descriptions, keywords and image ALT text.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">SEO Title (English)</label>
+                    <input type="text" maxLength={200} value={prodForm.seoTitleEn} onChange={(e) => setProdForm({ ...prodForm, seoTitleEn: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">SEO Title (বাংলা)</label>
+                    <input type="text" maxLength={200} value={prodForm.seoTitleBn} onChange={(e) => setProdForm({ ...prodForm, seoTitleBn: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Meta Description (English)</label>
+                    <textarea rows={2} maxLength={320} value={prodForm.seoDescriptionEn} onChange={(e) => setProdForm({ ...prodForm, seoDescriptionEn: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Meta Description (বাংলা)</label>
+                    <textarea rows={2} maxLength={320} value={prodForm.seoDescriptionBn} onChange={(e) => setProdForm({ ...prodForm, seoDescriptionBn: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Focus Keywords (comma separated)</label>
+                  <input type="text" maxLength={500} value={prodForm.focusKeywords} onChange={(e) => setProdForm({ ...prodForm, focusKeywords: e.target.value })} placeholder="pink salt, natural salt, NUSAIFA SPICES" className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Image ALT Text (English)</label>
+                    <input type="text" maxLength={250} value={prodForm.imageAltEn} onChange={(e) => setProdForm({ ...prodForm, imageAltEn: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Image ALT Text (বাংলা)</label>
+                    <input type="text" maxLength={250} value={prodForm.imageAltBn} onChange={(e) => setProdForm({ ...prodForm, imageAltBn: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4]" />
+                  </div>
                 </div>
               </div>
 

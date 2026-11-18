@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Lock, MapPin, ShieldCheck, Truck } from 'lucide-react';
-import { BANGLADESH_DISTRICTS, resolveDeliveryZone } from '../shared/bangladeshLocations.ts';
+import { BANGLADESH_DIVISIONS, BANGLADESH_DISTRICTS, resolveDeliveryZone } from '../shared/bangladeshLocations.ts';
 import type {
   DeliverySettings,
   Language,
@@ -34,13 +34,24 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [customerName, setCustomerName] = useState(user?.fullName || '');
   const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [district, setDistrict] = useState(user?.district || 'Dhaka');
+  const initialDivision =
+    BANGLADESH_DISTRICTS.find((d) => d.nameEn === user?.district)?.division || 'Dhaka';
+  const [division, setDivision] = useState(initialDivision);
+  const districtsInDivision = useMemo(
+    () => BANGLADESH_DISTRICTS.filter((d) => d.division === division),
+    [division]
+  );
+  const [district, setDistrict] = useState(
+    BANGLADESH_DISTRICTS.find((d) => d.nameEn === user?.district && d.division === initialDivision)?.nameEn ||
+    BANGLADESH_DISTRICTS.find((d) => d.division === initialDivision)?.nameEn ||
+    BANGLADESH_DISTRICTS[0].nameEn
+  );
   const districtObj = useMemo(
-    () => BANGLADESH_DISTRICTS.find((d) => d.nameEn === district) || BANGLADESH_DISTRICTS[0],
-    [district]
+    () => BANGLADESH_DISTRICTS.find((d) => d.nameEn === district) || districtsInDivision[0] || BANGLADESH_DISTRICTS[0],
+    [district, districtsInDivision]
   );
   const [upazila, setUpazila] = useState(
-    user?.upazila || districtObj.upazilas[0]?.nameEn || 'Dhanmondi'
+    user?.upazila || districtObj.upazilas[0]?.nameEn || ''
   );
   const [deliveryAddress, setDeliveryAddress] = useState(user?.address || '');
   const [customerNote, setCustomerNote] = useState('');
@@ -215,43 +226,49 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3531] mb-1.5">
-                {lang === 'bn' ? 'জেলা নির্বাচন করুন *' : 'District *'}
-              </label>
-              <select
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D6D0C4] text-sm bg-white focus:outline-none focus:border-[#075B42]"
-              >
-                {BANGLADESH_DISTRICTS.map((d) => (
-                  <option key={d.nameEn} value={d.nameEn}>
-                    {lang === 'bn' ? `${d.nameBn} (${d.nameEn})` : d.nameEn}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3531] mb-1.5">
-                {lang === 'bn' ? 'উপজেলা / থানা *' : 'Upazila / Area *'}
-              </label>
-              <select
-                value={upazila}
-                onChange={(e) => setUpazila(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D6D0C4] text-sm bg-white focus:outline-none focus:border-[#075B42]"
-              >
-                {districtObj.upazilas.map((u) => (
-                  <option key={u.nameEn} value={u.nameEn}>
-                    {lang === 'bn' ? `${u.nameBn} (${u.nameEn})` : u.nameEn}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
+           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  <div>
+    <label className="block text-xs font-semibold text-[#2C3531] mb-1.5">
+      {lang === 'bn' ? 'বিভাগ নির্বাচন করুন *' : 'Division *'}
+    </label>
+    <select value={division} onChange={(e) => {
+      const next = e.target.value;
+      const first = BANGLADESH_DISTRICTS.find(d => d.division === next);
+      setDivision(next);
+      if (first) {
+        setDistrict(first.nameEn);
+        setUpazila(first.upazilas[0]?.nameEn || '');
+      }
+    }} className="w-full px-3.5 py-2.5 rounded-lg border border-[#D6D0C4] text-sm bg-white">
+      {BANGLADESH_DIVISIONS.map(d => <option key={d.nameEn} value={d.nameEn}>
+        {lang === 'bn' ? `${d.nameBn} (${d.nameEn})` : d.nameEn}
+      </option>)}
+    </select>
+  </div>
+  <div>
+    <label className="block text-xs font-semibold text-[#2C3531] mb-1.5">
+      {lang === 'bn' ? 'জেলা নির্বাচন করুন *' : 'District *'}
+    </label>
+    <select value={district} onChange={e => setDistrict(e.target.value)}
+      className="w-full px-3.5 py-2.5 rounded-lg border border-[#D6D0C4] text-sm bg-white">
+      {districtsInDivision.map(d => <option key={d.nameEn} value={d.nameEn}>
+        {lang === 'bn' ? `${d.nameBn} (${d.nameEn})` : d.nameEn}
+      </option>)}
+    </select>
+  </div>
+  <div>
+    <label className="block text-xs font-semibold text-[#2C3531] mb-1.5">
+      {lang === 'bn' ? 'উপজেলা / থানা *' : 'Upazila / Area *'}
+    </label>
+    <select value={upazila} onChange={e => setUpazila(e.target.value)}
+      className="w-full px-3.5 py-2.5 rounded-lg border border-[#D6D0C4] text-sm bg-white">
+      {districtObj.upazilas.map(u => <option key={u.nameEn} value={u.nameEn}>
+        {lang === 'bn' ? `${u.nameBn} (${u.nameEn})` : u.nameEn}
+      </option>)}
+    </select>
+  </div>
+</div>
+<div>
             <label className="block text-xs font-semibold text-[#2C3531] mb-1.5">
               {lang === 'bn' ? 'বিস্তারিত ডেলিভারি ঠিকানা *' : 'Full Delivery Address *'}
             </label>

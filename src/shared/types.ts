@@ -59,6 +59,16 @@ export interface Product {
   galleryUrls: string[];
   isFeatured: boolean;
   isActive: boolean;
+
+  // SEO metadata (optional for backward compatibility)
+  seoTitleEn?: string;
+  seoTitleBn?: string;
+  seoDescriptionEn?: string;
+  seoDescriptionBn?: string;
+  focusKeywords?: string;
+  imageAltEn?: string;
+  imageAltBn?: string;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -180,4 +190,31 @@ export interface DashboardMetrics {
 export interface CartItem {
   productId: string;
   quantity: number;
+}
+
+
+export type PluginIntegrationStatus =
+  | 'available'
+  | 'connected'
+  | 'disconnected'
+  | 'error'
+  | 'planned';
+
+export interface PluginIntegration {
+  pluginKey: string;
+  enabled: boolean;
+  status: PluginIntegrationStatus;
+  settings: Record<string, unknown>;
+  lastError: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PluginActivityLog {
+  id: number;
+  pluginKey: string;
+  action: string;
+  details: Record<string, unknown>;
+  actorUserId: string | null;
+  createdAt: string;
 }

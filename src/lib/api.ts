@@ -10,6 +10,8 @@ import type {
   PaymentStatus,
   Product,
   PromotionalBanner,
+  PluginIntegration,
+  PluginActivityLog,
   SiteContentItem,
   UserPublic,
 } from '../shared/types.ts';
@@ -240,6 +242,24 @@ class ApiClient {
 
   adminDeleteBanner(id: string) {
     return this.request<{ ok: boolean }>(`/api/admin/banners/${id}`, { method: 'DELETE' });
+  }
+
+  adminListPluginIntegrations() {
+    return this.request<PluginIntegration[]>('/api/admin/plugins');
+  }
+
+  adminUpdatePlugin(
+    pluginKey: string,
+    payload: { enabled?: boolean; settings?: Record<string, unknown> }
+  ) {
+    return this.request<PluginIntegration>(
+      `/api/admin/plugins/${encodeURIComponent(pluginKey)}`,
+      { method: 'PUT', body: JSON.stringify(payload) }
+    );
+  }
+
+  adminListPluginActivity() {
+    return this.request<PluginActivityLog[]>('/api/admin/plugins/activity');
   }
 
   adminUpdateSiteContent(items: Array<{ key: string; valueEn: string; valueBn: string }>) {
