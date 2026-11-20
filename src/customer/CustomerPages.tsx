@@ -752,6 +752,13 @@ export const EditorialContentPage: React.FC<{
   };
 
   const info = titles[pageKey];
+  const contentItem = siteContent.find((s) => s.key === info.contentKey);
+  const contentTextColor = lang === 'bn'
+    ? contentItem?.textColorBn ?? '#3A433E'
+    : contentItem?.textColorEn ?? '#3A433E';
+  const contentBackgroundColor = lang === 'bn'
+    ? contentItem?.backgroundColorBn ?? '#FFFFFF'
+    : contentItem?.backgroundColorEn ?? '#FFFFFF';
 
   return (
     <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-8">
@@ -759,7 +766,7 @@ export const EditorialContentPage: React.FC<{
         <h1 className="text-3xl sm:text-4xl font-semibold text-[#141A17]">
           {lang === 'bn' ? info.bn : info.en}
         </h1>
-        <p className="mt-4 text-base text-[#3A433E] leading-relaxed whitespace-pre-line">
+        <p className="mt-4 text-base leading-relaxed whitespace-pre-line rounded-lg p-4" style={{ color: contentTextColor, backgroundColor: contentBackgroundColor }}>
           {getContent(info.contentKey)}
         </p>
       </div>

@@ -1325,28 +1325,57 @@ class StorageEngine {
         key: r.key,
         valueEn: r.value_en,
         valueBn: r.value_bn,
+        textColorEn: r.text_color_en ?? '#141A17',
+        textColorBn: r.text_color_bn ?? '#141A17',
+        backgroundColorEn: r.background_color_en ?? '#FFFFFF',
+        backgroundColorBn: r.background_color_bn ?? '#FFFFFF',
         updatedAt: new Date(r.updated_at).toISOString(),
       }));
     }
     const st = await this.getFileState();
-    return st.siteContent;
+    return st.siteContent.map((item) => ({
+      ...item,
+      textColorEn: item.textColorEn ?? '#141A17',
+      textColorBn: item.textColorBn ?? '#141A17',
+      backgroundColorEn: item.backgroundColorEn ?? '#FFFFFF',
+      backgroundColorBn: item.backgroundColorBn ?? '#FFFFFF',
+    }));
   }
 
   async updateSiteContent(
-    items: Array<{ key: string; valueEn: string; valueBn: string }>
+    items: Array<{
+      key: string;
+      valueEn: string;
+      valueBn: string;
+      textColorEn?: string;
+      textColorBn?: string;
+      backgroundColorEn?: string;
+      backgroundColorBn?: string;
+    }>
   ): Promise<SiteContentItem[]> {
     await this.ensureInitialized();
     const now = new Date().toISOString();
     if (this.pgPool) {
       for (const item of items) {
         await this.pgPool.query(
-          `INSERT INTO site_content (key, value_en, value_bn, updated_at)
-           VALUES ($1, $2, $3, NOW())
+          `INSERT INTO site_content
+            (key, value_en, value_bn, text_color_en, text_color_bn, background_color_en, background_color_bn, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
            ON CONFLICT (key) DO UPDATE SET
              value_en = EXCLUDED.value_en,
              value_bn = EXCLUDED.value_bn,
+             text_color_en = EXCLUDED.text_color_en,
+             text_color_bn = EXCLUDED.text_color_bn,
+             background_color_en = EXCLUDED.background_color_en,
+             background_color_bn = EXCLUDED.background_color_bn,
              updated_at = NOW()`,
-          [item.key, item.valueEn, item.valueBn]
+          [
+            item.key, item.valueEn, item.valueBn,
+            item.textColorEn ?? '#141A17',
+            item.textColorBn ?? '#141A17',
+            item.backgroundColorEn ?? '#FFFFFF',
+            item.backgroundColorBn ?? '#FFFFFF',
+          ]
         );
       }
       return this.getSiteContent();
@@ -1354,15 +1383,23 @@ class StorageEngine {
 
     const st = await this.getFileState();
     for (const item of items) {
+      const savedItem: SiteContentItem = {
+        ...item,
+        textColorEn: item.textColorEn ?? '#141A17',
+        textColorBn: item.textColorBn ?? '#141A17',
+        backgroundColorEn: item.backgroundColorEn ?? '#FFFFFF',
+        backgroundColorBn: item.backgroundColorBn ?? '#FFFFFF',
+        updatedAt: now,
+      };
       const idx = st.siteContent.findIndex((s) => s.key === item.key);
       if (idx >= 0) {
-        st.siteContent[idx] = { ...item, updatedAt: now };
+        st.siteContent[idx] = savedItem;
       } else {
-        st.siteContent.push({ ...item, updatedAt: now });
+        st.siteContent.push(savedItem);
       }
     }
     await this.persistFileState();
-    return st.siteContent;
+    return this.getSiteContent();
   }
 
   // ==================== CONTACT MESSAGES ====================
@@ -1537,55 +1574,346 @@ class StorageEngine {
 
   async importDatabaseBackup(snapshot: DatabaseSnapshot): Promise<void> {
     await this.ensureInitialized();
-    if (!snapshot || !Array.isArray(snapshot.categories) || !Array.isArray(snapshot.products)) {
+
+    if (
+      !snapshot ||
+      !Array.isArray(snapshot.users) ||
+      !Array.isArray(snapshot.categories) ||
+      !Array.isArray(snapshot.products) ||
+      !Array.isArray(snapshot.orders) ||
+      !Array.isArray(snapshot.banners) ||
+      !Array.isArray(snapshot.siteContent)
+    ) {
       throw new Error('Invalid backup payload structure.');
     }
+
+    const unique = (items: any[], key: string, label: string) => {
+      const values = items.map((item) => item?.[key]);
+      if (values.some((value) => value === undefined || value === null || value === '')) {
+        throw new Error(`Invalid ${label}: missing ${key}.`);
+      }
+      if (new Set(values).size !== values.length) {
+        throw new Error(`Invalid ${label}: duplicate ${key}.`);
+      }
+    };
+
+    unique(snapshot.categories, 'id', 'categories');
+    unique(snapshot.categories, 'slug', 'categories');
+    unique(snapshot.products, 'id', 'products');
+    unique(snapshot.products, 'slug', 'products');
+    unique(snapshot.products, 'sku', 'products');
+    unique(snapshot.users, 'id', 'users');
+    unique(snapshot.users, 'email', 'users');
+    unique(snapshot.orders, 'id', 'orders');
+    unique(snapshot.orders, 'orderNumber', 'orders');
+    unique(snapshot.banners, 'id', 'banners');
+    unique(snapshot.siteContent, 'key', 'site content');
+
+    const categoryIds = new Set(snapshot.categories.map((c) => c.id));
+    const productIds = new Set(snapshot.products.map((p) => p.id));
+    const userIds = new Set(snapshot.users.map((u) => u.id));
+
+    for (const product of snapshot.products) {
+      if (!categoryIds.has(product.categoryId)) {
+        throw new Error(`Product references a missing category: ${product.id}`);
+      }
+    }
+
+    for (const order of snapshot.orders) {
+      if (!Array.isArray(order.items) || !Array.isArray(order.notifications)) {
+        throw new Error(`Order is missing items or notifications: ${order.orderNumber}`);
+      }
+      if (order.userId && !userIds.has(order.userId)) {
+        throw new Error(`Order references a missing user: ${order.orderNumber}`);
+      }
+      for (const item of order.items) {
+        if (item.productId && !productIds.has(item.productId)) {
+          throw new Error(`Order item references a missing product: ${order.orderNumber}`);
+        }
+        if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
+          throw new Error(`Invalid order item quantity: ${order.orderNumber}`);
+        }
+      }
+    }
+
     if (!this.pgPool) {
+      const current = this.state!;
       this.state = {
         version: snapshot.version || 1,
         exportedAt: new Date().toISOString(),
-        users: Array.isArray(snapshot.users) ? snapshot.users : this.state!.users,
+        users: current.users,
         categories: snapshot.categories,
         products: snapshot.products,
-        deliverySettings: snapshot.deliverySettings || this.state!.deliverySettings,
-        orders: Array.isArray(snapshot.orders) ? snapshot.orders : [],
-        banners: Array.isArray(snapshot.banners) ? snapshot.banners : [],
-        siteContent: Array.isArray(snapshot.siteContent) ? snapshot.siteContent : [],
-        contactMessages: Array.isArray(snapshot.contactMessages) ? snapshot.contactMessages : [],
-        pluginIntegrations: Array.isArray(snapshot.pluginIntegrations)
-          ? snapshot.pluginIntegrations
-          : (this.state!.pluginIntegrations || []),
-        pluginActivityLogs: Array.isArray(snapshot.pluginActivityLogs)
-          ? snapshot.pluginActivityLogs
-          : (this.state!.pluginActivityLogs || []),
+        deliverySettings: snapshot.deliverySettings || current.deliverySettings,
+        orders: snapshot.orders,
+        banners: snapshot.banners,
+        siteContent: snapshot.siteContent,
+        contactMessages: current.contactMessages || [],
+        pluginIntegrations: current.pluginIntegrations || [],
+        pluginActivityLogs: current.pluginActivityLogs || [],
       };
       await this.persistFileState();
       return;
     }
 
-    // PostgreSQL transactional restore of catalog & configuration
     const client = await this.pgPool.connect();
+
     try {
       await client.query('BEGIN');
-      for (const c of snapshot.categories) {
-        await client.query(
-          `INSERT INTO categories (id, slug, name_en, name_bn, description_en, description_bn, sort_order, is_active)
+
+      // Keep existing Neon accounts and password hashes. Add only missing local users.
+      const userMap = new Map<string, string>();
+
+      for (const user of snapshot.users) {
+        const email = String(user.email || '').trim().toLowerCase();
+        if (!email || !user.passwordHash) {
+          throw new Error('A backup user is missing an email or password hash.');
+        }
+
+        let result = await client.query(
+          'SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1',
+          [email]
+        );
+
+        let userId = result.rows[0]?.id;
+
+        if (!userId) {
+          result = await client.query(
+            `INSERT INTO users
+              (full_name, email, phone, password_hash, role, district, upazila, address, is_active, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+             ON CONFLICT (email) DO NOTHING
+             RETURNING id`,
+            [
+              user.fullName,
+              email,
+              user.phone || '',
+              user.passwordHash,
+              user.role,
+              user.district || '',
+              user.upazila || '',
+              user.address || '',
+              user.isActive !== false,
+              user.createdAt || new Date().toISOString(),
+            ]
+          );
+          userId = result.rows[0]?.id;
+
+          if (!userId) {
+            const existing = await client.query(
+              'SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1',
+              [email]
+            );
+            userId = existing.rows[0]?.id;
+          }
+        }
+
+        if (!userId) throw new Error(`Could not map user account: ${email}`);
+        userMap.set(user.id, userId);
+      }
+
+      // Remove dependent store records in FK-safe order.
+      await client.query('DELETE FROM orders');
+      await client.query('DELETE FROM products');
+      await client.query('DELETE FROM categories');
+      await client.query('DELETE FROM promotional_banners');
+
+      // Recreate categories with PostgreSQL UUIDs.
+      const categoryMap = new Map<string, string>();
+
+      for (const category of snapshot.categories) {
+        const result = await client.query(
+          `INSERT INTO categories
+            (slug, name_en, name_bn, description_en, description_bn, sort_order, is_active, created_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-           ON CONFLICT (slug) DO UPDATE SET
-             name_en = EXCLUDED.name_en,
-             name_bn = EXCLUDED.name_bn,
-             description_en = EXCLUDED.description_en,
-             description_bn = EXCLUDED.description_bn,
-             sort_order = EXCLUDED.sort_order,
-             is_active = EXCLUDED.is_active`,
-          [c.id, c.slug, c.nameEn, c.nameBn, c.descriptionEn, c.descriptionBn, c.sortOrder, c.isActive]
+           RETURNING id`,
+          [
+            category.slug,
+            category.nameEn,
+            category.nameBn,
+            category.descriptionEn || '',
+            category.descriptionBn || '',
+            Number(category.sortOrder || 0),
+            category.isActive !== false,
+            category.createdAt || new Date().toISOString(),
+          ]
+        );
+        categoryMap.set(category.id, result.rows[0].id);
+      }
+
+      // Restore products and build a Local ID -> Neon UUID map.
+      const productMap = new Map<string, string>();
+
+      for (const product of snapshot.products) {
+        const categoryId = categoryMap.get(product.categoryId);
+        if (!categoryId) throw new Error(`Category mapping failed: ${product.id}`);
+
+        const result = await client.query(
+          `INSERT INTO products (
+            category_id, sku, slug, name_en, name_bn, short_desc_en, short_desc_bn,
+            description_en, description_bn, origin_en, origin_bn, weight_label,
+            price_bdt, discount_price_bdt, stock_qty, image_url, gallery_urls,
+            is_featured, is_active, seo_title_en, seo_title_bn, seo_description_en,
+            seo_description_bn, focus_keywords, image_alt_en, image_alt_bn,
+            created_at, updated_at
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+            $17::jsonb,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
+          ) RETURNING id`,
+          [
+            categoryId,
+            product.sku,
+            product.slug,
+            product.nameEn,
+            product.nameBn,
+            product.shortDescEn || '',
+            product.shortDescBn || '',
+            product.descriptionEn || '',
+            product.descriptionBn || '',
+            product.originEn || '',
+            product.originBn || '',
+            product.weightLabel || '',
+            product.priceBdt,
+            product.discountPriceBdt ?? null,
+            product.stockQty,
+            product.imageUrl || '',
+            JSON.stringify(product.galleryUrls || []),
+            Boolean(product.isFeatured),
+            product.isActive !== false,
+            product.seoTitleEn || '',
+            product.seoTitleBn || '',
+            product.seoDescriptionEn || '',
+            product.seoDescriptionBn || '',
+            product.focusKeywords || '',
+            product.imageAltEn || '',
+            product.imageAltBn || '',
+            product.createdAt || new Date().toISOString(),
+            product.updatedAt || product.createdAt || new Date().toISOString(),
+          ]
+        );
+
+        productMap.set(product.id, result.rows[0].id);
+      }
+
+      // Restore orders, items and notifications with fresh UUIDs.
+      for (const order of snapshot.orders) {
+        const userId = order.userId ? userMap.get(order.userId) : null;
+        if (order.userId && !userId) {
+          throw new Error(`User mapping failed for order ${order.orderNumber}`);
+        }
+
+        const orderResult = await client.query(
+          `INSERT INTO orders (
+            order_number, user_id, customer_name, customer_phone, customer_email,
+            district, upazila, delivery_address, delivery_zone, payment_method,
+            payment_status, order_status, subtotal_bdt, delivery_charge_bdt,
+            discount_bdt, total_bdt, customer_note, admin_note, created_at, updated_at
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+          ) RETURNING id`,
+          [
+            order.orderNumber,
+            userId,
+            order.customerName,
+            order.customerPhone,
+            order.customerEmail || '',
+            order.district,
+            order.upazila,
+            order.deliveryAddress,
+            order.deliveryZone,
+            order.paymentMethod,
+            order.paymentStatus,
+            order.orderStatus,
+            order.subtotalBdt,
+            order.deliveryChargeBdt,
+            order.discountBdt || 0,
+            order.totalBdt,
+            order.customerNote || '',
+            order.adminNote || '',
+            order.createdAt || new Date().toISOString(),
+            order.updatedAt || order.createdAt || new Date().toISOString(),
+          ]
+        );
+
+        const newOrderId = orderResult.rows[0].id;
+
+        for (const item of order.items) {
+          const productId = item.productId ? productMap.get(item.productId) : null;
+          if (item.productId && !productId) {
+            throw new Error(`Product mapping failed in order ${order.orderNumber}`);
+          }
+
+          await client.query(
+            `INSERT INTO order_items (
+              order_id, product_id, product_name_en, product_name_bn, sku,
+              weight_label, unit_price_bdt, quantity, line_total_bdt, image_url
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [
+              newOrderId,
+              productId,
+              item.productNameEn,
+              item.productNameBn,
+              item.sku,
+              item.weightLabel,
+              item.unitPriceBdt,
+              item.quantity,
+              item.lineTotalBdt,
+              item.imageUrl || '',
+            ]
+          );
+        }
+
+        for (const notification of order.notifications) {
+          await client.query(
+            `INSERT INTO order_notifications
+              (order_id, status, message_en, message_bn, created_at)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [
+              newOrderId,
+              notification.status,
+              notification.messageEn || '',
+              notification.messageBn || '',
+              notification.createdAt || new Date().toISOString(),
+            ]
+          );
+        }
+      }
+
+      // Restore promotional banners.
+      for (const banner of snapshot.banners) {
+        await client.query(
+          `INSERT INTO promotional_banners (
+            title_en, title_bn, subtitle_en, subtitle_bn, cta_label_en,
+            cta_label_bn, target_category_slug, image_url, is_active, sort_order, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [
+            banner.titleEn,
+            banner.titleBn,
+            banner.subtitleEn || '',
+            banner.subtitleBn || '',
+            banner.ctaLabelEn || 'Explore Collection',
+            banner.ctaLabelBn || 'সংগ্রহ দেখুন',
+            banner.targetCategorySlug || 'all',
+            banner.imageUrl,
+            banner.isActive !== false,
+            Number(banner.sortOrder || 0),
+            banner.createdAt || new Date().toISOString(),
+          ]
         );
       }
+
+      // Update delivery settings without changing the Plugin Center.
       if (snapshot.deliverySettings) {
         await client.query(
           `UPDATE delivery_settings SET
-             inside_dhaka_bdt = $1, sub_dhaka_bdt = $2, outside_dhaka_bdt = $3,
-             free_delivery_threshold_bdt = $4, cod_enabled = $5, bkash_enabled = $6, nagad_enabled = $7
+            inside_dhaka_bdt = $1,
+            sub_dhaka_bdt = $2,
+            outside_dhaka_bdt = $3,
+            free_delivery_threshold_bdt = $4,
+            cod_enabled = $5,
+            bkash_enabled = $6,
+            nagad_enabled = $7,
+            updated_at = $8
            WHERE id = 1`,
           [
             snapshot.deliverySettings.insideDhakaBdt,
@@ -1595,83 +1923,31 @@ class StorageEngine {
             snapshot.deliverySettings.codEnabled,
             snapshot.deliverySettings.bkashEnabled,
             snapshot.deliverySettings.nagadEnabled,
+            snapshot.deliverySettings.updatedAt || new Date().toISOString(),
           ]
         );
       }
-      for (const s of snapshot.siteContent || []) {
+
+      // Upsert Local CMS values; retain any additional Neon CMS keys.
+      for (const item of snapshot.siteContent) {
         await client.query(
           `INSERT INTO site_content (key, value_en, value_bn, updated_at)
-           VALUES ($1,$2,$3,NOW())
-           ON CONFLICT (key) DO UPDATE SET value_en = EXCLUDED.value_en, value_bn = EXCLUDED.value_bn, updated_at = NOW()`,
-          [s.key, s.valueEn, s.valueBn]
+           VALUES ($1,$2,$3,$4)
+           ON CONFLICT (key) DO UPDATE SET
+             value_en = EXCLUDED.value_en,
+             value_bn = EXCLUDED.value_bn,
+             updated_at = EXCLUDED.updated_at`,
+          [
+            item.key,
+            item.valueEn || '',
+            item.valueBn || '',
+            item.updatedAt || new Date().toISOString(),
+          ]
         );
       }
 
-      // Older backups omit plugin arrays; keep current Plugin Center data.
-      if (
-        Array.isArray(snapshot.pluginIntegrations) &&
-        Array.isArray(snapshot.pluginActivityLogs)
-      ) {
-        const pluginTables = await client.query(
-          `SELECT
-            to_regclass('public.plugin_integrations') IS NOT NULL AS integrations_exists,
-            to_regclass('public.plugin_activity_logs') IS NOT NULL AS logs_exists`
-        );
-
-        if (
-          !pluginTables.rows[0]?.integrations_exists ||
-          !pluginTables.rows[0]?.logs_exists
-        ) {
-          throw new Error(
-            'Plugin Center tables are not installed. Apply the approved migration before restoring this backup.'
-          );
-        }
-
-        await client.query('DELETE FROM plugin_activity_logs');
-        await client.query('DELETE FROM plugin_integrations');
-
-        for (const item of snapshot.pluginIntegrations) {
-          await client.query(
-            `INSERT INTO plugin_integrations
-              (plugin_key, enabled, status, settings, last_error, created_at, updated_at)
-             VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7)`,
-            [
-              item.pluginKey,
-              item.enabled,
-              item.status,
-              JSON.stringify(item.settings || {}),
-              item.lastError || '',
-              item.createdAt,
-              item.updatedAt,
-            ]
-          );
-        }
-
-        for (const item of snapshot.pluginActivityLogs) {
-          await client.query(
-            `INSERT INTO plugin_activity_logs
-              (id, plugin_key, action, details, actor_user_id, created_at)
-             VALUES ($1,$2,$3,$4::jsonb,$5,$6)`,
-            [
-              item.id,
-              item.pluginKey,
-              item.action,
-              JSON.stringify(item.details || {}),
-              item.actorUserId,
-              item.createdAt,
-            ]
-          );
-        }
-
-        await client.query(
-          `SELECT setval(
-            pg_get_serial_sequence('plugin_activity_logs', 'id'),
-            COALESCE((SELECT MAX(id) FROM plugin_activity_logs), 1),
-            EXISTS (SELECT 1 FROM plugin_activity_logs)
-          )`
-        );
-      }
-
+      // Contact messages, existing users, Plugin Center and migration history
+      // are intentionally preserved.
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');

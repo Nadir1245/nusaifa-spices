@@ -98,6 +98,12 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       ? announcementItem.valueBn
       : announcementItem.valueEn
     : '';
+  const announcementTextColor = lang === 'bn'
+    ? announcementItem?.textColorBn ?? '#FFFFFF'
+    : announcementItem?.textColorEn ?? '#FFFFFF';
+  const announcementBackgroundColor = lang === 'bn'
+    ? announcementItem?.backgroundColorBn ?? '#075B42'
+    : announcementItem?.backgroundColorEn ?? '#075B42';
 
   const primaryBanner = banners[0] || {
     id: 'fallback',
@@ -167,7 +173,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     <div className="min-h-screen flex flex-col bg-white text-[#141A17]">
       {/* Slim Dismissible Announcement Bar (<= 36px) */}
       {showAnnouncement && (
-        <div className="bg-[#075B42] text-white text-xs h-9 px-4 flex items-center justify-between gap-4">
+        <div className="text-xs h-9 px-4 flex items-center justify-between gap-4" style={{ color: announcementTextColor, backgroundColor: announcementBackgroundColor }}>
           <p className="truncate font-medium tracking-wide">{announcementText}</p>
           <div className="flex items-center gap-3 shrink-0">
             <button
@@ -332,8 +338,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                 <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
                   <div className="text-xs font-semibold tracking-widest uppercase text-[#8E6F16]">
                     {lang === 'bn'
-                      ? 'প্রাকৃতিক মসলা · অর্গানিক খাদ্য · ভেষজ সংগ্রহ'
-                      : 'Natural Spices · Organic Food · Herbal Wellness'}
+                      ? (siteContent.find((item) => item.key === 'homepage_tagline')?.valueBn || 'প্রাকৃতিক মসলা · অর্গানিক খাদ্য · ভেষজ সংগ্রহ')
+                      : (siteContent.find((item) => item.key === 'homepage_tagline')?.valueEn || 'Natural Spices · Organic Food · Herbal Wellness')}
                   </div>
 
                   <h1 className="text-4xl sm:text-5xl font-semibold text-[#141A17] leading-[1.1] text-balance">
@@ -367,13 +373,33 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                 </div>
 
                 <div className="lg:col-span-7">
-                  <div className="h-full min-h-[280px] lg:min-h-[420px] rounded-2xl overflow-hidden border border-[#E5E0D5] bg-[#075B42]">
-                    <img
-                      src={primaryBanner.imageUrl}
-                      alt="NUSAIFA SPICES collection"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="nusaifa-product-stage relative min-h-[390px] lg:min-h-[420px] rounded-2xl overflow-hidden border border-[#E5E0D5]">
+                    <div className="nusaifa-stage-glow" aria-hidden="true" />
+
+                    <div className="nusaifa-product-card nusaifa-float-1">
+                      <img src="/products/product_sundarban_honey_1794680615767.jpg" alt="Sundarban Honey" />
+                      <span>{lang === 'bn' ? 'সুন্দরবনের মধু' : 'Sundarban Honey'}</span>
+                    </div>
+
+                    <div className="nusaifa-product-card nusaifa-float-2">
+                      <img src="/products/product_moringa_superfood_1794680617098.jpg" alt="Moringa Powder" />
+                      <span>{lang === 'bn' ? 'মরিঙ্গা পাউডার' : 'Moringa Powder'}</span>
+                    </div>
+
+                    <div className="nusaifa-product-card nusaifa-float-3">
+                      <img src="/products/product_turmeric_powder_1794680615609.jpg" alt="Turmeric Powder" />
+                      <span>{lang === 'bn' ? 'হলুদ গুঁড়া' : 'Turmeric Powder'}</span>
+                    </div>
+
+                    <div className="nusaifa-product-card nusaifa-float-4">
+                      <img src="/products/product_black_seed_oil_1794680616988.jpg" alt="Black Seed Oil" />
+                      <span>{lang === 'bn' ? 'কালোজিরার তেল' : 'Black Seed Oil'}</span>
+                    </div>
+
+                    <div className="nusaifa-product-card nusaifa-float-5">
+                      <img src="/products/product_garam_masala_1794680617882.jpg" alt="Garam Masala" />
+                      <span>{lang === 'bn' ? 'গরম মসলা' : 'Garam Masala'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -384,12 +410,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-semibold text-[#141A17]">
-                    {lang === 'bn' ? 'আমাদের নির্বাচিত পণ্যসমূহ' : 'Our Selected Collection'}
+                    {lang === 'bn'
+                      ? (siteContent.find((item) => item.key === 'catalog_title')?.valueBn || 'আমাদের নির্বাচিত পণ্যসমূহ')
+                      : (siteContent.find((item) => item.key === 'catalog_title')?.valueEn || 'Our Selected Collection')}
                   </h2>
                   <p className="mt-1.5 text-sm text-[#59645F]">
                     {lang === 'bn'
-                      ? 'বিশ্বস্ত প্রস্তুতকারকের মূল সিল ও প্যাকেটে মসলা ও প্রাকৃতিক খাদ্যপণ্য অর্ডার করুন।'
-                      : 'Small-batch botanicals priced in BDT (৳) with nationwide Cash on Delivery'}
+                      ? (siteContent.find((item) => item.key === 'catalog_subtitle')?.valueBn || 'বিশ্বস্ত প্রস্তুতকারকের মূল সিল ও প্যাকেটে মসলা ও প্রাকৃতিক খাদ্যপণ্য অর্ডার করুন।')
+                      : (siteContent.find((item) => item.key === 'catalog_subtitle')?.valueEn || 'Small-batch botanicals priced in BDT (৳) with nationwide Cash on Delivery')}
                   </p>
                 </div>
 

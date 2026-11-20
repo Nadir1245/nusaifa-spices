@@ -262,7 +262,15 @@ class ApiClient {
     return this.request<PluginActivityLog[]>('/api/admin/plugins/activity');
   }
 
-  adminUpdateSiteContent(items: Array<{ key: string; valueEn: string; valueBn: string }>) {
+  adminUpdateSiteContent(items: Array<{
+    key: string;
+    valueEn: string;
+    valueBn: string;
+    textColorEn?: string;
+    textColorBn?: string;
+    backgroundColorEn?: string;
+    backgroundColorBn?: string;
+  }>) {
     return this.request<SiteContentItem[]>('/api/admin/site-content', {
       method: 'PUT',
       body: JSON.stringify({ items }),

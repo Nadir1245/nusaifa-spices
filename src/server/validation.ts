@@ -114,6 +114,10 @@ export const siteContentUpdateSchema = z.object({
       key: z.string().trim().min(1).max(80),
       valueEn: z.string().max(10000),
       valueBn: z.string().max(10000),
+      textColorEn: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/).optional().default('#141A17'),
+      textColorBn: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/).optional().default('#141A17'),
+      backgroundColorEn: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/).optional().default('#FFFFFF'),
+      backgroundColorBn: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/).optional().default('#FFFFFF'),
     })
   ),
 });

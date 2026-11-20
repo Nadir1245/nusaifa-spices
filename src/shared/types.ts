@@ -152,6 +152,10 @@ export interface SiteContentItem {
   key: string;
   valueEn: string;
   valueBn: string;
+  textColorEn?: string;
+  textColorBn?: string;
+  backgroundColorEn?: string;
+  backgroundColorBn?: string;
   updatedAt: string;
 }
 

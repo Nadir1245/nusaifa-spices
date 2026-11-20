@@ -172,7 +172,33 @@ export const AdminApp: React.FC<AdminAppProps> = ({
       setBanners(bans);
       setMessages(msgs);
       setDelivery(boot.deliverySettings);
-      setSiteContent(boot.siteContent);
+      const defaultHomeContent: SiteContentItem[] = [
+        {
+          key: 'homepage_tagline',
+          valueEn: 'Natural Spices · Organic Food · Herbal Wellness',
+          valueBn: 'প্রাকৃতিক মসলা · অর্গানিক খাদ্য · ভেষজ সংগ্রহ',
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          key: 'catalog_title',
+          valueEn: 'Our Selected Collection',
+          valueBn: 'আমাদের নির্বাচিত পণ্যসমূহ',
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          key: 'catalog_subtitle',
+          valueEn: 'Small-batch botanicals priced in BDT (৳) with nationwide Cash on Delivery',
+          valueBn: 'বিশ্বস্ত প্রস্তুতকারকের মূল সিল ও প্যাকেটে মসলা ও প্রাকৃতিক খাদ্যপণ্য অর্ডার করুন।',
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+      const mergedSiteContent = [...boot.siteContent];
+      defaultHomeContent.forEach((item) => {
+        if (!mergedSiteContent.some((existing) => existing.key === item.key)) {
+          mergedSiteContent.push(item);
+        }
+      });
+      setSiteContent(mergedSiteContent);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to load admin data.');
     }
@@ -406,7 +432,15 @@ export const AdminApp: React.FC<AdminAppProps> = ({
   const handleSaveSiteContent = async () => {
     try {
       await api.adminUpdateSiteContent(
-        siteContent.map((s) => ({ key: s.key, valueEn: s.valueEn, valueBn: s.valueBn }))
+        siteContent.map((s) => ({
+          key: s.key,
+          valueEn: s.valueEn,
+          valueBn: s.valueBn,
+          textColorEn: s.textColorEn ?? '#141A17',
+          textColorBn: s.textColorBn ?? '#141A17',
+          backgroundColorEn: s.backgroundColorEn ?? '#FFFFFF',
+          backgroundColorBn: s.backgroundColorBn ?? '#FFFFFF',
+        }))
       );
       notify('Website content saved.');
       await onStorefrontUpdated();
@@ -416,17 +450,27 @@ export const AdminApp: React.FC<AdminAppProps> = ({
   };
 
   const handleRestoreBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+
+      const confirmed = window.confirm(
+        'WARNING: This will replace the current store database with the selected backup. Existing users, products, categories, orders and settings may be replaced. Continue only if this is the correct backup.'
+      );
+
+      if (!confirmed) return;
+
       await api.adminRestoreBackup(parsed);
       notify('Database snapshot restored successfully.');
       await loadAllAdminData();
       await onStorefrontUpdated();
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid backup JSON file.');
+    } finally {
+      input.value = '';
     }
   };
 
@@ -1485,27 +1529,83 @@ export const AdminApp: React.FC<AdminAppProps> = ({
                       <span className="text-xs font-mono-tabular font-semibold text-[#075B42]">
                         {item.key}
                       </span>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <textarea
-                          rows={3}
-                          value={item.valueEn}
-                          onChange={(e) => {
-                            const next = [...siteContent];
-                            next[idx] = { ...item, valueEn: e.target.value };
-                            setSiteContent(next);
-                          }}
-                          className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4] bg-white text-xs"
-                        />
-                        <textarea
-                          rows={3}
-                          value={item.valueBn}
-                          onChange={(e) => {
-                            const next = [...siteContent];
-                            next[idx] = { ...item, valueBn: e.target.value };
-                            setSiteContent(next);
-                          }}
-                          className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4] bg-white text-xs"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {([
+                          {
+                            lang: 'English',
+                            value: item.valueEn,
+                            textColor: item.textColorEn ?? '#141A17',
+                            backgroundColor: item.backgroundColorEn ?? '#FFFFFF',
+                            textKey: 'textColorEn',
+                            bgKey: 'backgroundColorEn',
+                            valueKey: 'valueEn',
+                          },
+                          {
+                            lang: 'বাংলা',
+                            value: item.valueBn,
+                            textColor: item.textColorBn ?? '#141A17',
+                            backgroundColor: item.backgroundColorBn ?? '#FFFFFF',
+                            textKey: 'textColorBn',
+                            bgKey: 'backgroundColorBn',
+                            valueKey: 'valueBn',
+                          },
+                        ] as const).map((field) => (
+                          <div key={field.lang} className="space-y-3">
+                            <label className="block text-xs font-semibold text-[#59645F]">
+                              {field.lang} Content
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={field.value}
+                              onChange={(e) => {
+                                const next = [...siteContent];
+                                next[idx] = { ...item, [field.valueKey]: e.target.value };
+                                setSiteContent(next);
+                              }}
+                              className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4] bg-white text-xs"
+                            />
+                            <div className="grid grid-cols-2 gap-3">
+                              <label className="flex flex-col gap-1 text-[11px] text-[#59645F]">
+                                Text Color
+                                <input
+                                  type="color"
+                                  value={field.textColor}
+                                  onChange={(e) => {
+                                    const next = [...siteContent];
+                                    next[idx] = { ...item, [field.textKey]: e.target.value };
+                                    setSiteContent(next);
+                                  }}
+                                  className="w-full h-9 rounded border border-[#D6D0C4] cursor-pointer"
+                                />
+                                <span className="font-mono">{field.textColor}</span>
+                              </label>
+                              <label className="flex flex-col gap-1 text-[11px] text-[#59645F]">
+                                Background Color
+                                <input
+                                  type="color"
+                                  value={field.backgroundColor}
+                                  onChange={(e) => {
+                                    const next = [...siteContent];
+                                    next[idx] = { ...item, [field.bgKey]: e.target.value };
+                                    setSiteContent(next);
+                                  }}
+                                  className="w-full h-9 rounded border border-[#D6D0C4] cursor-pointer"
+                                />
+                                <span className="font-mono">{field.backgroundColor}</span>
+                              </label>
+                            </div>
+                            <div
+                              className="rounded-lg border border-dashed border-[#D6D0C4] p-3"
+                              style={{
+                                color: field.textColor,
+                                backgroundColor: field.backgroundColor,
+                              }}
+                            >
+                              <span className="block text-[10px] opacity-70 mb-1">LIVE PREVIEW</span>
+                              <p className="text-sm">{field.value || 'Your content preview'}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
