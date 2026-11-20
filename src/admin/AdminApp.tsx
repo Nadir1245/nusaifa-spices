@@ -191,6 +191,18 @@ export const AdminApp: React.FC<AdminAppProps> = ({
           valueBn: 'বিশ্বস্ত প্রস্তুতকারকের মূল সিল ও প্যাকেটে মসলা ও প্রাকৃতিক খাদ্যপণ্য অর্ডার করুন।',
           updatedAt: new Date().toISOString(),
         },
+        {
+          key: 'social_facebook',
+          valueEn: 'https://www.facebook.com/share/1JLYt6cdZQ/',
+          valueBn: 'https://www.facebook.com/share/1JLYt6cdZQ/',
+          updatedAt: new Date().toISOString(),
+        },
+        ...['whatsapp', 'instagram', 'youtube', 'tiktok'].map((platform) => ({
+          key: `social_${platform}`,
+          valueEn: '',
+          valueBn: '',
+          updatedAt: new Date().toISOString(),
+        })),
       ];
       const mergedSiteContent = [...boot.siteContent];
       defaultHomeContent.forEach((item) => {
@@ -1523,8 +1535,45 @@ export const AdminApp: React.FC<AdminAppProps> = ({
                   </button>
                 </div>
 
+                <section className="rounded-xl border border-[#D6D0C4] bg-[#F8F6F1] p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#075B42]">Social Media Links</h3>
+                    <p className="text-xs text-[#59645F] mt-1">Add your social profile URLs. Only platforms with a link will appear in the website footer.</p>
+                  </div>
+                  {[
+                    { key: 'social_facebook', label: 'Facebook' },
+                    { key: 'social_whatsapp', label: 'WhatsApp' },
+                    { key: 'social_instagram', label: 'Instagram' },
+                    { key: 'social_youtube', label: 'YouTube' },
+                    { key: 'social_tiktok', label: 'TikTok' },
+                  ].map((platform) => {
+                    const idx = siteContent.findIndex((item) => item.key === platform.key);
+                    const value = idx >= 0 ? siteContent[idx].valueEn : '';
+                    return (
+                      <label key={platform.key} className="block space-y-1">
+                        <span className="text-xs font-semibold text-[#59645F]">{platform.label} URL</span>
+                        <input
+                          type="url"
+                          value={value}
+                          onChange={(e) => {
+                            const next = [...siteContent];
+                            if (idx >= 0) {
+                              next[idx] = { ...next[idx], valueEn: e.target.value, valueBn: e.target.value };
+                            } else {
+                              next.push({ key: platform.key, valueEn: e.target.value, valueBn: e.target.value, updatedAt: new Date().toISOString() });
+                            }
+                            setSiteContent(next);
+                          }}
+                          placeholder={`https://${platform.label.toLowerCase()}.com/your-page`}
+                          className="w-full px-3 py-2 rounded-lg border border-[#D6D0C4] bg-white text-xs"
+                        />
+                      </label>
+                    );
+                  })}
+                </section>
+
                 <div className="space-y-5">
-                  {siteContent.map((item, idx) => (
+                  {siteContent.filter((item) => !item.key.startsWith('social_')).map((item, idx) => (
                     <div key={item.key} className="p-4 rounded-xl bg-[#F8F6F1] border border-[#E5E0D5] space-y-2">
                       <span className="text-xs font-mono-tabular font-semibold text-[#075B42]">
                         {item.key}

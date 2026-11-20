@@ -829,6 +829,38 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             </button>
           </div>
         </div>
+        {[
+          { key: 'social_facebook', label: 'Facebook', symbol: 'f' },
+          { key: 'social_whatsapp', label: 'WhatsApp', symbol: '◉' },
+          { key: 'social_instagram', label: 'Instagram', symbol: '◎' },
+          { key: 'social_youtube', label: 'YouTube', symbol: '▶' },
+          { key: 'social_tiktok', label: 'TikTok', symbol: '♪' },
+        ].filter((social) => siteContent.find((item) => item.key === social.key)?.valueEn?.trim()).length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-6 flex flex-wrap items-center justify-center gap-3">
+            {[
+              { key: 'social_facebook', label: 'Facebook', symbol: 'f' },
+              { key: 'social_whatsapp', label: 'WhatsApp', symbol: '◉' },
+              { key: 'social_instagram', label: 'Instagram', symbol: '◎' },
+              { key: 'social_youtube', label: 'YouTube', symbol: '▶' },
+              { key: 'social_tiktok', label: 'TikTok', symbol: '♪' },
+            ].map((social) => {
+              const url = siteContent.find((item) => item.key === social.key)?.valueEn?.trim();
+              return url ? (
+                <a
+                  key={social.key}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.label}
+                  title={social.label}
+                  className="w-10 h-10 rounded-full border border-[#D6D0C4] bg-white text-[#075B42] hover:bg-[#075B42] hover:text-white flex items-center justify-center text-lg font-bold transition-colors"
+                >
+                  {social.symbol}
+                </a>
+              ) : null;
+            })}
+          </div>
+        )}
         <div className="border-t border-[#E5E0D5] py-4 px-4 sm:px-6 max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs text-[#59645F]">
           <span>© {new Date().getFullYear()} NUSAIFA SPICES. All rights reserved.</span>
           <span>Mirwarispur, Begumganj, Chowmuhani, Noakhali 3823, Bangladesh</span>
