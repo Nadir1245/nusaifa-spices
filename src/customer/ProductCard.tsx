@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Leaf, Plus } from 'lucide-react';
+import { Check, Heart, Leaf, Plus } from 'lucide-react';
 import type { Category, Language, Product } from '../shared/types.ts';
 import { formatBdt, t } from '../lib/i18n.ts';
 
@@ -9,6 +9,9 @@ interface ProductCardProps {
   lang: Language;
   onSelect: (product: Product) => void;
   onAdd: (product: Product) => void;
+  wishlistEnabled: boolean;
+  isWishlisted: boolean;
+  onToggleWishlist: (product: Product) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -17,6 +20,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   lang,
   onSelect,
   onAdd,
+  wishlistEnabled,
+  isWishlisted,
+  onToggleWishlist,
 }) => {
   const [imgError, setImgError] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
@@ -57,6 +63,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Leaf className="w-8 h-8 mb-2 opacity-75" />
             <span className="text-sm font-medium">{title}</span>
           </div>
+        )}
+        {wishlistEnabled && (
+          <button
+            type="button"
+            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWishlist(product);
+            }}
+            className={`absolute top-3 right-3 z-10 w-10 h-10 rounded-full shadow-md flex items-center justify-center transition-colors ${
+              isWishlisted
+                ? 'bg-[#075B42] text-white'
+                : 'bg-white/95 text-[#075B42] hover:bg-[#D4AF37] hover:text-white'
+            }`}
+          >
+            <Heart className="w-5 h-5" fill={isWishlisted ? 'currentColor' : 'none'} />
+          </button>
         )}
       </div>
 

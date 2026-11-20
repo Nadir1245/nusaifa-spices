@@ -1,4 +1,5 @@
 import type {
+  AppSettings,
   Category,
   ContactMessage,
   CustomerSummary,
@@ -60,6 +61,13 @@ class ApiClient {
       banners: PromotionalBanner[];
       deliverySettings: DeliverySettings;
       siteContent: SiteContentItem[];
+      publicSettings: {
+        checkoutEnabled: boolean;
+        orderAcceptanceEnabled: boolean;
+        customerLoginEnabled: boolean;
+        customerRegistrationEnabled: boolean;
+        wishlistEnabled: boolean;
+      };
     }>('/api/storefront/bootstrap');
   }
 
@@ -127,6 +135,23 @@ class ApiClient {
 
   myOrders() {
     return this.request<Order[]>('/api/orders/my');
+  }
+
+  // Customer Wishlist
+  getWishlist() {
+    return this.request<Product[]>('/api/wishlist');
+  }
+
+  addWishlistItem(productId: string) {
+    return this.request<{ ok: boolean }>(`/api/wishlist/${encodeURIComponent(productId)}`, {
+      method: 'POST',
+    });
+  }
+
+  removeWishlistItem(productId: string) {
+    return this.request<{ ok: boolean }>(`/api/wishlist/${encodeURIComponent(productId)}`, {
+      method: 'DELETE',
+    });
   }
 
   submitContact(payload: {
@@ -210,6 +235,17 @@ class ApiClient {
 
   adminListCustomers() {
     return this.request<CustomerSummary[]>('/api/admin/customers');
+  }
+
+  adminGetAppSettings() {
+    return this.request<AppSettings>('/api/admin/app-settings');
+  }
+
+  adminUpdateAppSettings(payload: Omit<AppSettings, 'updatedAt'>) {
+    return this.request<AppSettings>('/api/admin/app-settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   }
 
   adminUpdateDeliverySettings(payload: Omit<DeliverySettings, 'updatedAt'>) {

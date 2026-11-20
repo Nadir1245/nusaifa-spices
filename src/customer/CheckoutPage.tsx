@@ -17,6 +17,8 @@ interface CheckoutPageProps {
   lang: Language;
   products: Product[];
   deliverySettings: DeliverySettings;
+  checkoutEnabled: boolean;
+  orderAcceptanceEnabled: boolean;
   user: UserPublic | null;
   onOrderConfirmed: (order: Order) => void;
   onBack: () => void;
@@ -26,6 +28,8 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   lang,
   products,
   deliverySettings,
+  checkoutEnabled,
+  orderAcceptanceEnabled,
   user,
   onOrderConfirmed,
   onBack,
@@ -102,6 +106,14 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!checkoutEnabled) {
+      setError(lang === 'bn' ? 'চেকআউট বর্তমানে বন্ধ রয়েছে। পরে আবার চেষ্টা করুন।' : 'Checkout is currently unavailable. Please try again later.');
+      return;
+    }
+    if (!orderAcceptanceEnabled) {
+      setError(lang === 'bn' ? 'নতুন অর্ডার গ্রহণ সাময়িকভাবে বন্ধ রয়েছে।' : 'New order acceptance is temporarily paused.');
+      return;
+    }
     if (items.length === 0) {
       setError(lang === 'bn' ? 'আপনার ব্যাগ খালি।' : 'Your shopping bag is empty.');
       return;
@@ -127,6 +139,24 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
       setSubmitting(false);
     }
   };
+
+  if (!checkoutEnabled || !orderAcceptanceEnabled) {
+    return (
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <h2 className="text-2xl font-semibold text-[#141A17]">
+          {lang === 'bn' ? 'অর্ডার গ্রহণ সাময়িকভাবে বন্ধ' : 'Ordering Temporarily Unavailable'}
+        </h2>
+        <p className="mt-3 text-[#59645F]">
+          {lang === 'bn'
+            ? (!checkoutEnabled ? 'চেকআউট বর্তমানে বন্ধ রয়েছে। পরে আবার চেষ্টা করুন।' : 'নতুন অর্ডার গ্রহণ সাময়িকভাবে বন্ধ রয়েছে।')
+            : (!checkoutEnabled ? 'Checkout is currently unavailable. Please try again later.' : 'New order acceptance is temporarily paused.')}
+        </p>
+        <button type="button" onClick={onBack} className="mt-6 px-5 py-2.5 rounded-lg bg-[#075B42] text-white">
+          {lang === 'bn' ? 'দোকানে ফিরে যান' : 'Back to Shop'}
+        </button>
+      </section>
+    );
+  }
 
   if (items.length === 0) {
     return (

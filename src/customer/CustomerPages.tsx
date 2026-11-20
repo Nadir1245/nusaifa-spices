@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
+  Heart,
+  Trash2,
   CheckCircle2,
   Clock,
   LogOut,
@@ -450,14 +452,17 @@ export const OrderTrackingPage: React.FC<{
 export const CustomerAccountPage: React.FC<{
   lang: Language;
   user: UserPublic | null;
+  customerLoginEnabled: boolean;
+  customerRegistrationEnabled: boolean;
   onAuthChange: (user: UserPublic | null) => void;
   onTrackOrder: (order: Order) => void;
-}> = ({ lang, user, onAuthChange, onTrackOrder }) => {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+}> = ({ lang, user, customerLoginEnabled, customerRegistrationEnabled, onAuthChange, onTrackOrder }) => {
+  const [mode, setMode] = useState<'login' | 'register'>(customerLoginEnabled ? 'login' : 'register');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -472,7 +477,15 @@ export const CustomerAccountPage: React.FC<{
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (
+      (mode === 'login' && !customerLoginEnabled) ||
+      (mode === 'register' && !customerRegistrationEnabled)
+    ) {
+      setError(lang === 'bn' ? 'এই সেবাটি সাময়িকভাবে বন্ধ রয়েছে।' : 'This service is temporarily unavailable.');
+      return;
+    }
     setError('');
+    setSuccess('');
     setLoading(true);
     try {
       if (mode === 'login') {
@@ -481,8 +494,15 @@ export const CustomerAccountPage: React.FC<{
         onAuthChange(res.user);
       } else {
         const res = await api.register({ fullName, email, phone, password });
-        api.setToken(res.token);
-        onAuthChange(res.user);
+        if (customerLoginEnabled) {
+          api.setToken(res.token);
+          onAuthChange(res.user);
+        } else {
+          setSuccess(lang === 'bn'
+            ? 'আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে। Customer Login বন্ধ থাকায় আপনাকে লগইন করা হয়নি।'
+            : 'Your account was created successfully. You are not logged in because Customer Login is disabled.');
+          setPassword('');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed.');
@@ -497,36 +517,57 @@ export const CustomerAccountPage: React.FC<{
     onAuthChange(null);
   };
 
+  if (!user && !customerLoginEnabled && !customerRegistrationEnabled) {
+    return (
+      <section className="max-w-md mx-auto px-4 py-14">
+        <div className="bg-white border border-[#E5E0D5] rounded-2xl p-6 text-center">
+          <h1 className="text-xl font-semibold text-[#141A17]">
+            {lang === 'bn' ? 'গ্রাহক অ্যাকাউন্ট সেবা সাময়িক বন্ধ' : 'Customer Account Services Temporarily Unavailable'}
+          </h1>
+          <p className="text-sm text-[#59645F] mt-3">
+            {lang === 'bn' ? 'দুঃখিত, লগইন ও নতুন অ্যাকাউন্ট খোলার সুবিধা বর্তমানে বন্ধ রয়েছে। পরে আবার চেষ্টা করুন।' : 'Sorry, customer login and registration are currently disabled. Please try again later.'}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   if (!user) {
     return (
       <section className="max-w-md mx-auto px-4 py-14">
         <div className="bg-white border border-[#E5E0D5] rounded-2xl p-6 sm:p-8 space-y-6">
-          <div className="flex gap-1 p-1 bg-[#F8F6F1] rounded-lg border border-[#E5E0D5]">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setError('');
-              }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors ${
-                mode === 'login' ? 'bg-white text-[#075B42] shadow-sm' : 'text-[#59645F]'
-              }`}
-            >
-              {t(lang, 'signIn')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setError('');
-              }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors ${
-                mode === 'register' ? 'bg-white text-[#075B42] shadow-sm' : 'text-[#59645F]'
-              }`}
-            >
-              {t(lang, 'createAccount')}
-            </button>
-          </div>
+          {(customerLoginEnabled || customerRegistrationEnabled) && (
+            <div className="flex gap-1 p-1 bg-[#F8F6F1] rounded-lg border border-[#E5E0D5]">
+              {customerLoginEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login');
+                    setError('');
+                  }}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors ${
+                    mode === 'login' ? 'bg-white text-[#075B42] shadow-sm' : 'text-[#59645F]'
+                  }`}
+                >
+                  {t(lang, 'signIn')}
+                </button>
+              )}
+              {customerRegistrationEnabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setError('');
+                  }}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors ${
+                    mode === 'register' ? 'bg-white text-[#075B42] shadow-sm' : 'text-[#59645F]'
+                  }`}
+                >
+                  {t(lang, 'createAccount')}
+                </button>
+              )}
+            </div>
+          )}
 
           <div>
             <h1 className="text-2xl font-semibold text-[#141A17]">
@@ -548,6 +589,11 @@ export const CustomerAccountPage: React.FC<{
           {error && (
             <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+              {success}
             </div>
           )}
 
@@ -874,6 +920,111 @@ export const EditorialContentPage: React.FC<{
               <span>{lang === 'bn' ? 'বার্তা পাঠান' : 'Submit Message'}</span>
             </button>
           </form>
+        </div>
+      )}
+    </section>
+  );
+};
+
+
+interface WishlistPageProps {
+  lang: Language;
+  products: Product[];
+  onRemove: (product: Product) => void;
+  onAdd: (product: Product) => void;
+  onSelect: (product: Product) => void;
+}
+
+export const WishlistPage: React.FC<WishlistPageProps> = ({
+  lang,
+  products,
+  onRemove,
+  onAdd,
+  onSelect,
+}) => {
+  return (
+    <section className="max-w-7xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-7">
+        <Heart className="w-7 h-7 text-[#075B42]" />
+        <h1 className="text-2xl font-bold text-[#141A17]">
+          {lang === 'bn' ? 'আমার উইশলিস্ট' : 'My Wishlist'}
+        </h1>
+        <span className="text-sm text-[#727D78]">({products.length})</span>
+      </div>
+
+      {products.length === 0 ? (
+        <div className="text-center py-20 bg-[#F8F6F1] rounded-xl border border-[#E5E0D5]">
+          <Heart className="w-12 h-12 mx-auto mb-4 text-[#A5AEA8]" />
+          <h2 className="text-lg font-semibold text-[#141A17]">
+            {lang === 'bn' ? 'উইশলিস্ট এখনো খালি' : 'Your wishlist is empty'}
+          </h2>
+          <p className="text-sm text-[#727D78] mt-2">
+            {lang === 'bn'
+              ? 'পছন্দের পণ্যে হার্ট আইকনে চাপ দিয়ে এখানে সংরক্ষণ করুন।'
+              : 'Save your favorite products here using the heart icon.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product) => {
+            const price =
+              product.discountPriceBdt !== null &&
+              product.discountPriceBdt < product.priceBdt
+                ? product.discountPriceBdt
+                : product.priceBdt;
+
+            return (
+              <article
+                key={product.id}
+                className="bg-[#F8F6F1] border border-[#E5E0D5] rounded-xl overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(product)}
+                  className="block w-full text-left"
+                >
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={lang === 'bn' ? product.nameBn : product.nameEn}
+                      className="w-full aspect-[4/3] object-cover"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[4/3] bg-[#EFECE4] flex items-center justify-center text-[#075B42]">
+                      <Heart className="w-10 h-10" />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <h3 className="font-semibold text-[#141A17]">
+                      {lang === 'bn' ? product.nameBn : product.nameEn}
+                    </h3>
+                    <p className="mt-2 text-lg font-bold text-[#075B42]">
+                      {formatBdt(price)}
+                    </p>
+                  </div>
+                </button>
+
+                <div className="px-4 pb-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onAdd(product)}
+                    disabled={product.stockQty <= 0}
+                    className="flex-1 rounded-lg bg-[#075B42] text-white py-2.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {lang === 'bn' ? 'কার্টে যোগ করুন' : 'Add to Cart'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(product)}
+                    aria-label={lang === 'bn' ? 'উইশলিস্ট থেকে সরান' : 'Remove from wishlist'}
+                    className="w-11 rounded-lg border border-[#D6D0C4] text-rose-700 flex items-center justify-center"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

@@ -18,6 +18,7 @@ import {
 } from './src/server/auth.ts';
 import { storage, type DatabaseSnapshot } from './src/server/storage.ts';
 import {
+  appSettingsSchema,
   bannerSchema,
   categorySchema,
   contactMessageSchema,
@@ -49,6 +50,134 @@ async function bootstrapServer() {
   // Static serving for uploaded media and generated product photography
   app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d' }));
   app.use('/src/assets/images', express.static(ASSETS_IMAGES_DIR, { maxAge: '7d' }));
+
+  // ==================== MAINTENANCE MODE ====================
+  // Keep the admin dashboard and essential static assets accessible.
+  app.use(async (req, res, next) => {
+    const requestPath = req.path;
+
+    const allowedPaths = [
+      '/admin',
+      '/api/health',
+      '/api/auth/login',
+      '/api/auth/logout',
+      '/api/auth/me',
+    ];
+
+    const isAllowed =
+      allowedPaths.some((item) =>
+        requestPath === item || requestPath.startsWith(item + '/')
+      ) ||
+      requestPath.startsWith('/api/admin/') ||
+      requestPath.startsWith('/uploads/') ||
+      requestPath.startsWith('/src/assets/images/') ||
+      /\\.(js|css|map|png|jpe?g|webp|svg|ico|woff2?|ttf|json)$/i.test(requestPath) ||
+      requestPath.startsWith('/@vite/') ||
+      requestPath.startsWith('/@react-refresh') ||
+      requestPath.startsWith('/node_modules/');
+
+    if (isAllowed) {
+      next();
+      return;
+    }
+
+    try {
+      const settings = await storage.getAppSettings();
+
+      if (!settings.storefrontVisible) {
+        res.status(503);
+        res.setHeader('Cache-Control', 'no-store');
+
+        if (requestPath.startsWith('/api/')) {
+          res.json({
+            error: 'The storefront is currently unavailable.',
+            storefrontVisible: false,
+          });
+          return;
+        }
+
+        res.type('html').send(`<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NUSAIFA SPICES - Store Temporarily Unavailable</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;
+      padding:24px;background:#f0f5ed;color:#183d2b;
+      font-family:Arial,sans-serif;text-align:center}
+    main{max-width:520px;padding:36px 26px;background:#fff;
+      border-radius:20px;box-shadow:0 12px 40px #183d2b16}
+    h1{color:#17613d;margin:18px 0 12px}
+    p{line-height:1.7;color:#52675a}
+    .brand{font-weight:bold;letter-spacing:2px;color:#a47a27}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">NUSAIFA SPICES</div>
+    <h1>আমাদের স্টোর সাময়িকভাবে বন্ধ</h1>
+    <p>আমরা শিগগিরই আবার ফিরে আসব। অনুগ্রহ করে পরে আবার ভিজিট করুন।</p>
+    <hr>
+    <h1>Our Store Is Temporarily Unavailable</h1>
+    <p>We’ll be back soon. Please visit us again later.</p>
+  </main>
+</body>
+</html>`);
+        return;
+      }
+
+      if (!settings.maintenanceMode) {
+        next();
+        return;
+      }
+
+      res.status(503);
+      res.setHeader('Cache-Control', 'no-store');
+
+      if (requestPath.startsWith('/api/')) {
+        res.json({
+          error: 'The store is temporarily under maintenance. Please try again later.',
+          maintenanceMode: true,
+        });
+        return;
+      }
+
+      res.type('html').send(`<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NUSAIFA SPICES - Maintenance</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;
+      padding:24px;background:#f0f5ed;color:#183d2b;
+      font-family:Arial,sans-serif;text-align:center}
+    main{max-width:520px;padding:36px 26px;background:#fff;
+      border-radius:20px;box-shadow:0 12px 40px #183d2b16}
+    h1{color:#17613d;margin:0 0 12px}
+    p{line-height:1.7;color:#52675a}
+    .brand{font-weight:bold;letter-spacing:2px;color:#a47a27}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">NUSAIFA SPICES</div>
+    <h1>সাময়িক রক্ষণাবেক্ষণ চলছে</h1>
+    <p>আমাদের ওয়েবসাইটে কিছু উন্নয়নমূলক কাজ চলছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।</p>
+    <hr>
+    <h1>We’ll be back soon!</h1>
+    <p>Our store is temporarily undergoing maintenance. Please visit us again shortly.</p>
+  </main>
+</body>
+</html>`);
+    } catch {
+      // A settings-store error must not lock customers out of the website.
+      next();
+    }
+  });
 
   const uploadStorage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
@@ -111,12 +240,13 @@ async function bootstrapServer() {
 
   app.get('/api/storefront/bootstrap', async (_req, res) => {
     try {
-      const [categories, products, banners, deliverySettings, siteContent] = await Promise.all([
+      const [categories, products, banners, deliverySettings, siteContent, appSettings] = await Promise.all([
         storage.listCategories(false),
         storage.listProducts(false),
         storage.listBanners(false),
         storage.getDeliverySettings(),
         storage.getSiteContent(),
+        storage.getAppSettings(),
       ]);
       res.json({
         categories,
@@ -124,6 +254,13 @@ async function bootstrapServer() {
         banners,
         deliverySettings,
         siteContent,
+        publicSettings: {
+          checkoutEnabled: appSettings.checkoutEnabled,
+          orderAcceptanceEnabled: appSettings.orderAcceptanceEnabled,
+          customerLoginEnabled: appSettings.customerLoginEnabled,
+          customerRegistrationEnabled: appSettings.customerRegistrationEnabled,
+          wishlistEnabled: appSettings.wishlistEnabled,
+        },
       });
     } catch (err) {
       console.error('Bootstrap error:', err);
@@ -164,6 +301,12 @@ async function bootstrapServer() {
       return;
     }
     try {
+      const appSettings = await storage.getAppSettings();
+      if (!appSettings.customerRegistrationEnabled) {
+        res.status(403).json({ error: 'Customer registration is currently disabled.' });
+        return;
+      }
+
       const existing = await storage.findUserByEmail(parsed.data.email);
       if (existing) {
         res.status(409).json({ error: 'An account with this email already exists.' });
@@ -192,6 +335,13 @@ async function bootstrapServer() {
       if (!userRecord || !userRecord.isActive) {
         res.status(401).json({ error: 'Invalid email or password.' });
         return;
+      }
+      if (userRecord.role === 'customer') {
+        const settings = await storage.getAppSettings();
+        if (!settings.customerLoginEnabled) {
+          res.status(403).json({ error: 'Customer login is currently disabled.' });
+          return;
+        }
       }
       const valid = await verifyPassword(parsed.data.password, userRecord.passwordHash);
       if (!valid) {
@@ -228,6 +378,16 @@ async function bootstrapServer() {
   // ==================== ORDERS & TRACKING ====================
 
   app.post('/api/orders', attachOptionalAuth, async (req: AuthenticatedRequest, res) => {
+    const orderSettings = await storage.getAppSettings();
+    if (!orderSettings.checkoutEnabled) {
+      res.status(403).json({ error: 'Checkout is currently disabled.' });
+      return;
+    }
+    if (!orderSettings.orderAcceptanceEnabled) {
+      res.status(403).json({ error: 'New order acceptance is currently disabled.' });
+      return;
+    }
+
     const parsed = createOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid order payload.' });
@@ -280,7 +440,79 @@ async function bootstrapServer() {
     }
   });
 
+  // Customer-only Wishlist API
+  app.get('/api/wishlist', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (req.authUser?.role !== 'customer') {
+        res.status(403).json({ error: 'Customer access only.' });
+        return;
+      }
+      const settings = await storage.getAppSettings();
+      if (!settings.wishlistEnabled) {
+        res.status(403).json({ error: 'Wishlist is currently disabled.' });
+        return;
+      }
+      const products = await storage.listWishlistProducts(req.authUser.sub);
+      res.json(products);
+    } catch {
+      res.status(500).json({ error: 'Failed to load wishlist.' });
+    }
+  });
+
+  app.post('/api/wishlist/:productId', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (req.authUser?.role !== 'customer') {
+        res.status(403).json({ error: 'Customer access only.' });
+        return;
+      }
+      const settings = await storage.getAppSettings();
+      if (!settings.wishlistEnabled) {
+        res.status(403).json({ error: 'Wishlist is currently disabled.' });
+        return;
+      }
+      const productId = String(req.params.productId || '');
+      const product = (await storage.listProducts()).find((item) => item.id === productId);
+      if (!product) {
+        res.status(404).json({ error: 'Active product not found.' });
+        return;
+      }
+      await storage.addWishlistItem(req.authUser.sub, productId);
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: 'Failed to add wishlist item.' });
+    }
+  });
+
+  app.delete('/api/wishlist/:productId', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (req.authUser?.role !== 'customer') {
+        res.status(403).json({ error: 'Customer access only.' });
+        return;
+      }
+      const settings = await storage.getAppSettings();
+      if (!settings.wishlistEnabled) {
+        res.status(403).json({ error: 'Wishlist is currently disabled.' });
+        return;
+      }
+      await storage.removeWishlistItem(req.authUser.sub, String(req.params.productId || ''));
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: 'Failed to remove wishlist item.' });
+    }
+  });
+
   app.post('/api/contact', async (req, res) => {
+    try {
+      const appSettings = await storage.getAppSettings();
+      if (!appSettings.contactFormEnabled) {
+        res.status(403).json({ error: 'Contact form is currently disabled.' });
+        return;
+      }
+    } catch {
+      res.status(500).json({ error: 'Unable to check contact form settings.' });
+      return;
+    }
+
     const parsed = contactMessageSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid contact form data.' });
@@ -509,6 +741,29 @@ async function bootstrapServer() {
       res.json(updated);
     } catch {
       res.status(500).json({ error: 'Failed to update delivery charges.' });
+    }
+  });
+
+  app.get('/api/admin/app-settings', requireAdmin, async (_req, res) => {
+    try {
+      res.json(await storage.getAppSettings());
+    } catch {
+      res.status(500).json({ error: 'Failed to load application settings.' });
+    }
+  });
+
+  app.put('/api/admin/app-settings', requireAdmin, async (req, res) => {
+    const parsed = appSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: parsed.error.issues[0]?.message || 'Invalid application settings.',
+      });
+      return;
+    }
+    try {
+      res.json(await storage.updateAppSettings(parsed.data));
+    } catch {
+      res.status(500).json({ error: 'Failed to update application settings.' });
     }
   });
 

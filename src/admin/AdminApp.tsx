@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Package,
   Puzzle,
+  Settings,
   Plus,
   ShoppingCart,
   Trash2,
@@ -27,6 +28,7 @@ import type {
   CustomerSummary,
   DashboardMetrics,
   DeliverySettings,
+  AppSettings,
   Order,
   OrderStatus,
   Product,
@@ -49,6 +51,7 @@ type AdminTab =
   | 'delivery'
   | 'cms'
   | 'plugins'
+  | 'control'
   | 'seo'
   | 'reports';
 
@@ -80,6 +83,8 @@ export const AdminApp: React.FC<AdminAppProps> = ({
   const [siteContent, setSiteContent] = useState<SiteContentItem[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [delivery, setDelivery] = useState<DeliverySettings | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [appSettingsSaving, setAppSettingsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [pluginIntegrations, setPluginIntegrations] = useState<PluginIntegration[]>([]);
@@ -154,7 +159,7 @@ export const AdminApp: React.FC<AdminAppProps> = ({
 
   const loadAllAdminData = async () => {
     try {
-      const [m, prods, cats, ords, custs, bans, msgs, boot] = await Promise.all([
+      const [m, prods, cats, ords, custs, bans, msgs, boot, appSettingsData] = await Promise.all([
         api.adminMetrics(),
         api.adminListProducts(),
         api.adminListCategories(),
@@ -163,6 +168,7 @@ export const AdminApp: React.FC<AdminAppProps> = ({
         api.adminListBanners(),
         api.adminListMessages(),
         api.getBootstrap(),
+        api.adminGetAppSettings(),
       ]);
       setMetrics(m);
       setProducts(prods);
@@ -172,6 +178,7 @@ export const AdminApp: React.FC<AdminAppProps> = ({
       setBanners(bans);
       setMessages(msgs);
       setDelivery(boot.deliverySettings);
+      setAppSettings(appSettingsData);
       const defaultHomeContent: SiteContentItem[] = [
         {
           key: 'homepage_tagline',
@@ -213,6 +220,53 @@ export const AdminApp: React.FC<AdminAppProps> = ({
       setSiteContent(mergedSiteContent);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to load admin data.');
+    }
+  };
+
+  const updateAppSetting = async (
+    key:
+      | 'maintenanceMode'
+      | 'customerRegistrationEnabled'
+      | 'contactFormEnabled'
+      | 'storefrontVisible'
+      | 'checkoutEnabled'
+      | 'orderAcceptanceEnabled'
+      | 'customerLoginEnabled'
+      | 'wishlistEnabled'
+      | 'couponSystemEnabled'
+      | 'productReviewsEnabled'
+      | 'orderTrackingEnabled'
+      | 'inventoryManagementEnabled',
+    value: boolean
+  ) => {
+    if (!appSettings || appSettingsSaving) return;
+
+    setAppSettingsSaving(true);
+    setErrorMessage('');
+    setStatusMessage('');
+
+    try {
+      const updated = await api.adminUpdateAppSettings({
+        maintenanceMode: key === 'maintenanceMode' ? value : appSettings.maintenanceMode,
+        customerRegistrationEnabled: key === 'customerRegistrationEnabled' ? value : appSettings.customerRegistrationEnabled,
+        contactFormEnabled: key === 'contactFormEnabled' ? value : appSettings.contactFormEnabled,
+        storefrontVisible: key === 'storefrontVisible' ? value : appSettings.storefrontVisible,
+        checkoutEnabled: key === 'checkoutEnabled' ? value : appSettings.checkoutEnabled,
+        orderAcceptanceEnabled: key === 'orderAcceptanceEnabled' ? value : appSettings.orderAcceptanceEnabled,
+        customerLoginEnabled: key === 'customerLoginEnabled' ? value : appSettings.customerLoginEnabled,
+        wishlistEnabled: key === 'wishlistEnabled' ? value : appSettings.wishlistEnabled,
+        couponSystemEnabled: key === 'couponSystemEnabled' ? value : appSettings.couponSystemEnabled,
+        productReviewsEnabled: key === 'productReviewsEnabled' ? value : appSettings.productReviewsEnabled,
+        orderTrackingEnabled: key === 'orderTrackingEnabled' ? value : appSettings.orderTrackingEnabled,
+        inventoryManagementEnabled: key === 'inventoryManagementEnabled' ? value : appSettings.inventoryManagementEnabled,
+      });
+
+      setAppSettings(updated);
+      setStatusMessage('Application settings saved successfully.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to save application settings.');
+    } finally {
+      setAppSettingsSaving(false);
     }
   };
 
@@ -562,6 +616,7 @@ export const AdminApp: React.FC<AdminAppProps> = ({
     { id: 'delivery', label: 'Delivery & Pay', icon: <Truck className="w-4 h-4" /> },
     { id: 'cms', label: 'Banners & CMS', icon: <FileText className="w-4 h-4" /> },
     { id: 'plugins', label: 'Plugin Center', icon: <Puzzle className="w-4 h-4" /> },
+    { id: 'control', label: 'Advanced Control Center', icon: <Settings className="w-4 h-4" /> },
     { id: 'seo', label: 'SEO Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'reports', label: 'Reports & Backup', icon: <Database className="w-4 h-4" /> },
   ];
@@ -1825,6 +1880,214 @@ export const AdminApp: React.FC<AdminAppProps> = ({
                   ))}
                 </div>
               )}
+            </section>
+          )}
+
+          {/* TAB: ADVANCED CONTROL CENTER */}
+          {tab === 'control' && (
+            <section className="space-y-6">
+              <div className="bg-white border border-[#E5E0D5] rounded-xl p-6">
+                <div className="flex items-center gap-3">
+                  <Settings className="w-6 h-6 text-[#075B42]" />
+                  <div>
+                    <h2 className="text-xl font-semibold text-[#141A17]">
+                      Advanced Control Center
+                    </h2>
+                    <p className="text-sm text-[#59645F] mt-1">
+                      Manage important storefront access and availability settings.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {!appSettings ? (
+                <div className="bg-white border border-[#E5E0D5] rounded-xl p-6 text-sm text-[#59645F]">
+                  Loading application settings...
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {([
+                    {
+                      key: 'maintenanceMode' as const,
+                      title: 'Maintenance Mode',
+                      description: 'Temporarily show a maintenance page to storefront visitors. Admin access remains available.',
+                      enabled: appSettings.maintenanceMode,
+                    },
+                    {
+                      key: 'storefrontVisible' as const,
+                      title: 'Storefront Visibility',
+                      description: 'Show or hide the public storefront while keeping admin access available.',
+                      enabled: appSettings.storefrontVisible,
+                    },
+                    {
+                      key: 'checkoutEnabled' as const,
+                      title: 'Checkout Control',
+                      description: 'Allow or prevent customers from accessing the checkout process.',
+                      enabled: appSettings.checkoutEnabled,
+                    },
+                    {
+                      key: 'orderAcceptanceEnabled' as const,
+                      title: 'Order Acceptance',
+                      description: 'Allow or stop new order submissions.',
+                      enabled: appSettings.orderAcceptanceEnabled,
+                    },
+                    {
+                      key: 'customerLoginEnabled' as const,
+                      title: 'Customer Login',
+                      description: 'Allow or prevent customer accounts from logging in. Admin login remains available.',
+                      enabled: appSettings.customerLoginEnabled,
+                    },
+                    {
+                      key: 'customerRegistrationEnabled' as const,
+                      title: 'Customer Registration',
+                      description: 'Allow or prevent new customers from creating accounts.',
+                      enabled: appSettings.customerRegistrationEnabled,
+                    },
+                    {
+                      key: 'contactFormEnabled' as const,
+                      title: 'Contact Form',
+                      description: 'Allow or prevent visitors from submitting the website contact form.',
+                      enabled: appSettings.contactFormEnabled,
+                    },
+                  ]).map((item) => (
+                    <div
+                      key={item.key}
+                      className="bg-white border border-[#E5E0D5] rounded-xl p-5 space-y-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-[#141A17]">{item.title}</h3>
+                          <p className="text-xs text-[#59645F] mt-2 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                          item.enabled
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {item.enabled ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={appSettingsSaving}
+                        onClick={() => updateAppSetting(item.key, !item.enabled)}
+                        className={`w-full rounded-lg px-4 py-3 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                          item.enabled
+                            ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
+                            : 'bg-[#075B42] text-white hover:bg-[#054431]'
+                        }`}
+                      >
+                        {appSettingsSaving
+                          ? 'Saving...'
+                          : item.enabled
+                            ? 'Turn OFF'
+                            : 'Turn ON'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-white border border-[#E5E0D5] rounded-xl p-6 space-y-2">
+                <div className="flex items-center gap-3">
+                  <Settings className="w-6 h-6 text-[#075B42]" />
+                  <div>
+                    <h2 className="text-xl font-semibold text-[#141A17]">
+                      Feature Management Center
+                    </h2>
+                    <p className="text-sm text-[#59645F] mt-1">
+                      Enable or disable optional store features.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {!appSettings ? null : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {([
+                    {
+                      key: 'wishlistEnabled' as const,
+                      title: 'Wishlist',
+                      description: 'Allow customers to save products to their favorites list.',
+                      enabled: appSettings.wishlistEnabled,
+                    },
+                    {
+                      key: 'couponSystemEnabled' as const,
+                      title: 'Coupon System',
+                      description: 'Enable discount coupons during checkout.',
+                      enabled: appSettings.couponSystemEnabled,
+                    },
+                    {
+                      key: 'productReviewsEnabled' as const,
+                      title: 'Product Reviews',
+                      description: 'Allow customers to submit product reviews and ratings.',
+                      enabled: appSettings.productReviewsEnabled,
+                    },
+                    {
+                      key: 'orderTrackingEnabled' as const,
+                      title: 'Order Tracking',
+                      description: 'Allow customers to view their order status.',
+                      enabled: appSettings.orderTrackingEnabled,
+                    },
+                    {
+                      key: 'inventoryManagementEnabled' as const,
+                      title: 'Inventory Management',
+                      description: 'Enable product stock control and inventory management.',
+                      enabled: appSettings.inventoryManagementEnabled,
+                    },
+                  ]).map((item) => (
+                    <div
+                      key={item.key}
+                      className="bg-white border border-[#E5E0D5] rounded-xl p-5 space-y-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-[#141A17]">{item.title}</h3>
+                          <p className="text-xs text-[#59645F] mt-2 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                          item.enabled
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {item.enabled ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={appSettingsSaving}
+                        onClick={() => updateAppSetting(item.key, !item.enabled)}
+                        className={`w-full rounded-lg px-4 py-3 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                          item.enabled
+                            ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
+                            : 'bg-[#075B42] text-white hover:bg-[#054431]'
+                        }`}
+                      >
+                        {appSettingsSaving
+                          ? 'Saving...'
+                          : item.enabled
+                            ? 'Turn OFF'
+                            : 'Turn ON'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-amber-900">
+                  Important
+                </p>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  These controls do not delete products, orders, customers or other store data.
+                  Maintenance Mode keeps the admin dashboard accessible.
+                </p>
+              </div>
             </section>
           )}
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Menu,
@@ -20,6 +20,7 @@ import type {
   UserPublic,
 } from '../shared/types.ts';
 import { formatBdt, t } from '../lib/i18n.ts';
+import { api } from '../lib/api.ts';
 import { useCart } from './CartContext.tsx';
 import { CheckoutPage } from './CheckoutPage.tsx';
 import {
@@ -28,6 +29,7 @@ import {
   OrderConfirmationView,
   OrderTrackingPage,
   ProductDetailView,
+  WishlistPage,
 } from './CustomerPages.tsx';
 import { ProductCard } from './ProductCard.tsx';
 
@@ -37,6 +39,7 @@ export type CustomerRoute =
   | 'checkout'
   | 'confirmed'
   | 'track'
+  | 'wishlist'
   | 'account'
   | 'about'
   | 'contact'
@@ -52,6 +55,13 @@ interface CustomerAppProps {
   banners: PromotionalBanner[];
   deliverySettings: DeliverySettings;
   siteContent: SiteContentItem[];
+  publicSettings: {
+    checkoutEnabled: boolean;
+    orderAcceptanceEnabled: boolean;
+    customerLoginEnabled: boolean;
+    customerRegistrationEnabled: boolean;
+    wishlistEnabled: boolean;
+  };
   user: UserPublic | null;
   onAuthChange: (user: UserPublic | null) => void;
   onRefreshStorefront: () => Promise<void>;
@@ -66,6 +76,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   banners,
   deliverySettings,
   siteContent,
+  publicSettings,
   user,
   onAuthChange,
   onRefreshStorefront,
@@ -91,6 +102,18 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [sortBy, setSortBy] = useState<'featured' | 'price_asc' | 'price_desc'>('featured');
   const [showAnnouncement, setShowAnnouncement] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (!publicSettings.wishlistEnabled || !user || user.role !== 'customer') {
+      setWishlistProducts([]);
+      return;
+    }
+
+    api.getWishlist()
+      .then(setWishlistProducts)
+      .catch(() => setWishlistProducts([]));
+  }, [user?.id, user?.role, publicSettings.wishlistEnabled]);
 
   const announcementItem = siteContent.find((s) => s.key === 'announcement_bar');
   const announcementText = announcementItem
@@ -155,6 +178,51 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     setRoute(next);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleToggleWishlist = async (product: Product) => {
+    if (!user || user.role !== 'customer') {
+      alert(lang === 'bn'
+        ? 'উইশলিস্ট ব্যবহার করতে আগে লগইন করুন।'
+        : 'Please log in to use your wishlist.');
+      goRoute('account');
+      return;
+    }
+
+    if (!publicSettings.wishlistEnabled) return;
+
+    const alreadySaved = wishlistProducts.some((item) => item.id === product.id);
+
+    try {
+      if (alreadySaved) {
+        await api.removeWishlistItem(product.id);
+        setWishlistProducts((current) => current.filter((item) => item.id !== product.id));
+      } else {
+        await api.addWishlistItem(product.id);
+        setWishlistProducts((current) =>
+          current.some((item) => item.id === product.id)
+            ? current
+            : [...current, product]
+        );
+      }
+    } catch {
+      alert(lang === 'bn'
+        ? 'উইশলিস্ট আপডেট করা যায়নি। আবার চেষ্টা করুন।'
+        : 'Could not update wishlist. Please try again.');
+    }
+  };
+
+  const handleRemoveWishlist = async (product: Product) => {
+    try {
+      await api.removeWishlistItem(product.id);
+      setWishlistProducts((current) =>
+        current.filter((item) => item.id !== product.id)
+      );
+    } catch {
+      alert(lang === 'bn'
+        ? 'উইশলিস্ট থেকে সরানো যায়নি। আবার চেষ্টা করুন।'
+        : 'Could not remove this item. Please try again.');
+    }
   };
 
   const scrollToCatalog = (catSlug = 'all') => {
@@ -227,6 +295,15 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             >
               {t(lang, 'navTrack')}
             </button>
+            {publicSettings.wishlistEnabled && (
+              <button
+                type="button"
+                onClick={() => goRoute(user?.role === 'customer' ? 'wishlist' : 'account')}
+                className="hover:text-[#075B42] transition-colors whitespace-nowrap shrink-0"
+              >
+                {lang === 'bn' ? 'উইশলিস্ট' : 'Wishlist'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => goRoute('about')}
@@ -293,6 +370,18 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             >
               {t(lang, 'navTrack')}
             </button>
+            {publicSettings.wishlistEnabled && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  goRoute(user?.role === 'customer' ? 'wishlist' : 'account');
+                }}
+                className="block w-full text-left py-2 text-[#141A17]"
+              >
+                {lang === 'bn' ? 'উইশলিস্ট' : 'Wishlist'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => goRoute('about')}
@@ -504,6 +593,9 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                         goRoute('product');
                       }}
                       onAdd={(p) => addToCart(p.id, 1)}
+                      wishlistEnabled={publicSettings.wishlistEnabled}
+                      isWishlisted={wishlistProducts.some((item) => item.id === product.id)}
+                      onToggleWishlist={handleToggleWishlist}
                     />
                   ))}
                 </div>
@@ -577,6 +669,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             lang={lang}
             products={products}
             deliverySettings={deliverySettings}
+            checkoutEnabled={publicSettings.checkoutEnabled}
+            orderAcceptanceEnabled={publicSettings.orderAcceptanceEnabled}
             user={user}
             onOrderConfirmed={(order) => {
               setConfirmedOrder(order);
@@ -599,6 +693,19 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
           />
         )}
 
+        {route === 'wishlist' && user?.role === 'customer' && publicSettings.wishlistEnabled && (
+          <WishlistPage
+            lang={lang}
+            products={wishlistProducts}
+            onRemove={handleRemoveWishlist}
+            onAdd={(product) => addToCart(product.id, 1)}
+            onSelect={(product) => {
+              setSelectedProduct(product);
+              goRoute('product');
+            }}
+          />
+        )}
+
         {route === 'track' && (
           <OrderTrackingPage lang={lang} initialOrder={trackedOrder} />
         )}
@@ -606,6 +713,8 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
         {route === 'account' && (
           <CustomerAccountPage
             lang={lang}
+            customerLoginEnabled={publicSettings.customerLoginEnabled}
+            customerRegistrationEnabled={publicSettings.customerRegistrationEnabled}
             user={user}
             onAuthChange={onAuthChange}
             onTrackOrder={(ord) => {

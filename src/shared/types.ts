@@ -222,3 +222,19 @@ export interface PluginActivityLog {
   actorUserId: string | null;
   createdAt: string;
 }
+
+export interface AppSettings {
+  maintenanceMode: boolean;
+  customerRegistrationEnabled: boolean;
+  contactFormEnabled: boolean;
+  storefrontVisible: boolean;
+  checkoutEnabled: boolean;
+  orderAcceptanceEnabled: boolean;
+  customerLoginEnabled: boolean;
+  wishlistEnabled: boolean;
+  couponSystemEnabled: boolean;
+  productReviewsEnabled: boolean;
+  orderTrackingEnabled: boolean;
+  inventoryManagementEnabled: boolean;
+  updatedAt: string;
+}

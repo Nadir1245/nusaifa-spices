@@ -129,3 +129,19 @@ export const contactMessageSchema = z.object({
   subject: z.string().trim().min(2).max(200),
   message: z.string().trim().min(5).max(3000),
 });
+
+
+export const appSettingsSchema = z.object({
+  maintenanceMode: z.boolean(),
+  customerRegistrationEnabled: z.boolean(),
+  contactFormEnabled: z.boolean(),
+  storefrontVisible: z.boolean(),
+  checkoutEnabled: z.boolean(),
+  orderAcceptanceEnabled: z.boolean(),
+  customerLoginEnabled: z.boolean(),
+  wishlistEnabled: z.boolean(),
+  couponSystemEnabled: z.boolean(),
+  productReviewsEnabled: z.boolean(),
+  orderTrackingEnabled: z.boolean(),
+  inventoryManagementEnabled: z.boolean(),
+});

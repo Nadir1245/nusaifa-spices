@@ -42,6 +42,13 @@ export default function App() {
     updatedAt: '',
   });
   const [siteContent, setSiteContent] = useState<SiteContentItem[]>([]);
+  const [publicSettings, setPublicSettings] = useState({
+    checkoutEnabled: true,
+    orderAcceptanceEnabled: true,
+    customerLoginEnabled: true,
+    customerRegistrationEnabled: true,
+    wishlistEnabled: false,
+  });
 
   const loadStorefront = useCallback(async () => {
     const data = await api.getBootstrap();
@@ -50,6 +57,7 @@ export default function App() {
     setBanners(data.banners);
     setDeliverySettings(data.deliverySettings);
     setSiteContent(data.siteContent);
+    setPublicSettings(data.publicSettings);
   }, []);
 
   useEffect(() => {
@@ -153,6 +161,7 @@ export default function App() {
         banners={banners}
         deliverySettings={deliverySettings}
         siteContent={siteContent}
+        publicSettings={publicSettings}
         user={user}
         onAuthChange={setUser}
         onRefreshStorefront={loadStorefront}

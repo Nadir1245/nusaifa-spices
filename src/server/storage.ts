@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Pool } from 'pg';
 import type {
+  AppSettings,
   Category,
   ContactMessage,
   CustomerSummary,
@@ -55,6 +56,28 @@ export interface PluginActivityLogRecord {
   createdAt: string;
 }
 
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  maintenanceMode: false,
+  customerRegistrationEnabled: true,
+  contactFormEnabled: true,
+  storefrontVisible: true,
+  checkoutEnabled: true,
+  orderAcceptanceEnabled: true,
+  customerLoginEnabled: true,
+  wishlistEnabled: true,
+  couponSystemEnabled: true,
+  productReviewsEnabled: true,
+  orderTrackingEnabled: true,
+  inventoryManagementEnabled: true,
+  updatedAt: new Date(0).toISOString(),
+};
+
+export interface WishlistItemRecord {
+  userId: string;
+  productId: string;
+  createdAt: string;
+}
+
 export interface DatabaseSnapshot {
   version: number;
   exportedAt: string;
@@ -68,6 +91,8 @@ export interface DatabaseSnapshot {
   contactMessages: ContactMessage[];
   pluginIntegrations?: PluginIntegrationRecord[];
   pluginActivityLogs?: PluginActivityLogRecord[];
+  appSettings?: AppSettings;
+  wishlistItems?: WishlistItemRecord[];
 }
 
 export interface CreateOrderInput {
@@ -200,6 +225,11 @@ class StorageEngine {
         pluginActivityLogs: Array.isArray(parsed.pluginActivityLogs)
           ? parsed.pluginActivityLogs
           : [],
+        wishlistItems: Array.isArray(parsed.wishlistItems) ? parsed.wishlistItems : [],
+        appSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          ...(parsed.appSettings || {}),
+        },
       };
     } catch {
       const adminEmail = (process.env.ADMIN_EMAIL || 'admin@nusaifaspices.com').toLowerCase();
@@ -249,6 +279,8 @@ class StorageEngine {
         contactMessages: [],
         pluginIntegrations: [],
         pluginActivityLogs: [],
+        wishlistItems: [],
+        appSettings: structuredClone(DEFAULT_APP_SETTINGS),
       };
       await this.persistFileState();
     }
@@ -616,6 +648,92 @@ class StorageEngine {
       .sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || b.createdAt.localeCompare(a.createdAt));
   }
 
+  async listWishlistProducts(userId: string): Promise<Product[]> {
+    await this.ensureInitialized();
+
+    if (this.pgPool) {
+      const { rows } = await this.pgPool.query(
+        `SELECT p.*
+         FROM customer_wishlist w
+         JOIN products p ON p.id = w.product_id
+         WHERE w.user_id = $1 AND p.is_active = TRUE
+         ORDER BY w.created_at DESC`,
+        [userId]
+      );
+      return rows.map(this.mapPgProduct);
+    }
+
+    const st = await this.getFileState();
+    const items = (st.wishlistItems || [])
+      .filter((item) => item.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return items
+      .map((item) => st.products.find(
+        (product) => product.id === item.productId && product.isActive
+      ))
+      .filter((product): product is Product => Boolean(product));
+  }
+
+  async addWishlistItem(userId: string, productId: string): Promise<boolean> {
+    await this.ensureInitialized();
+
+    if (this.pgPool) {
+      const result = await this.pgPool.query(
+        `INSERT INTO customer_wishlist (user_id, product_id)
+         SELECT $1, id FROM products
+         WHERE id = $2 AND is_active = TRUE
+         ON CONFLICT (user_id, product_id) DO NOTHING`,
+        [userId, productId]
+      );
+      return (result.rowCount || 0) > 0;
+    }
+
+    const st = await this.getFileState();
+    const product = st.products.find(
+      (item) => item.id === productId && item.isActive
+    );
+    if (!product) return false;
+
+    if (!(st.wishlistItems || []).some(
+      (item) => item.userId === userId && item.productId === productId
+    )) {
+      st.wishlistItems = st.wishlistItems || [];
+      st.wishlistItems.push({
+        userId,
+        productId,
+        createdAt: new Date().toISOString(),
+      });
+      await this.persistFileState();
+    }
+    return true;
+  }
+
+  async removeWishlistItem(userId: string, productId: string): Promise<boolean> {
+    await this.ensureInitialized();
+
+    if (this.pgPool) {
+      const result = await this.pgPool.query(
+        'DELETE FROM customer_wishlist WHERE user_id = $1 AND product_id = $2',
+        [userId, productId]
+      );
+      return (result.rowCount || 0) > 0;
+    }
+
+    const st = await this.getFileState();
+    const items = st.wishlistItems || [];
+    const remaining = items.filter(
+      (item) => !(item.userId === userId && item.productId === productId)
+    );
+    const removed = remaining.length !== items.length;
+
+    if (removed) {
+      st.wishlistItems = remaining;
+      await this.persistFileState();
+    }
+    return removed;
+  }
+
   async createProduct(
     data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Product> {
@@ -844,6 +962,106 @@ class StorageEngine {
     st.deliverySettings = { ...data, updatedAt };
     await this.persistFileState();
     return st.deliverySettings;
+  }
+
+  // ==================== APP SETTINGS ====================
+
+  async getAppSettings(): Promise<AppSettings> {
+    await this.ensureInitialized();
+
+    if (this.pgPool) {
+      const { rows } = await this.pgPool.query(
+        'SELECT * FROM app_settings WHERE id = 1'
+      );
+      if (!rows[0]) return { ...DEFAULT_APP_SETTINGS };
+      return {
+        maintenanceMode: Boolean(rows[0].maintenance_mode),
+        customerRegistrationEnabled: Boolean(rows[0].customer_registration_enabled),
+        contactFormEnabled: Boolean(rows[0].contact_form_enabled),
+        storefrontVisible: Boolean(rows[0].storefront_visible),
+        checkoutEnabled: Boolean(rows[0].checkout_enabled),
+        orderAcceptanceEnabled: Boolean(rows[0].order_acceptance_enabled),
+        customerLoginEnabled: Boolean(rows[0].customer_login_enabled),
+        wishlistEnabled: Boolean(rows[0].wishlist_enabled),
+        couponSystemEnabled: Boolean(rows[0].coupon_system_enabled),
+        productReviewsEnabled: Boolean(rows[0].product_reviews_enabled),
+        orderTrackingEnabled: Boolean(rows[0].order_tracking_enabled),
+        inventoryManagementEnabled: Boolean(rows[0].inventory_management_enabled),
+        updatedAt: new Date(rows[0].updated_at).toISOString(),
+      };
+    }
+
+    const st = await this.getFileState();
+    return { ...DEFAULT_APP_SETTINGS, ...(st.appSettings || {}) };
+  }
+
+  async updateAppSettings(
+    data: Omit<AppSettings, 'updatedAt'>
+  ): Promise<AppSettings> {
+    await this.ensureInitialized();
+    const updatedAt = new Date().toISOString();
+
+    if (this.pgPool) {
+      const { rows } = await this.pgPool.query(
+        `INSERT INTO app_settings (
+          id, maintenance_mode, customer_registration_enabled, contact_form_enabled,
+          storefront_visible, checkout_enabled, order_acceptance_enabled, customer_login_enabled,
+          wishlist_enabled, coupon_system_enabled, product_reviews_enabled, order_tracking_enabled,
+          inventory_management_enabled, updated_at
+        )
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          maintenance_mode = EXCLUDED.maintenance_mode,
+          customer_registration_enabled = EXCLUDED.customer_registration_enabled,
+          contact_form_enabled = EXCLUDED.contact_form_enabled,
+          storefront_visible = EXCLUDED.storefront_visible,
+          checkout_enabled = EXCLUDED.checkout_enabled,
+          order_acceptance_enabled = EXCLUDED.order_acceptance_enabled,
+          customer_login_enabled = EXCLUDED.customer_login_enabled,
+          wishlist_enabled = EXCLUDED.wishlist_enabled,
+          coupon_system_enabled = EXCLUDED.coupon_system_enabled,
+          product_reviews_enabled = EXCLUDED.product_reviews_enabled,
+          order_tracking_enabled = EXCLUDED.order_tracking_enabled,
+          inventory_management_enabled = EXCLUDED.inventory_management_enabled,
+          updated_at = NOW()
+        RETURNING *`,
+        [
+          data.maintenanceMode,
+          data.customerRegistrationEnabled,
+          data.contactFormEnabled,
+          data.storefrontVisible,
+          data.checkoutEnabled,
+          data.orderAcceptanceEnabled,
+          data.customerLoginEnabled,
+          data.wishlistEnabled,
+          data.couponSystemEnabled,
+          data.productReviewsEnabled,
+          data.orderTrackingEnabled,
+          data.inventoryManagementEnabled,
+        ]
+      );
+
+      return {
+        maintenanceMode: Boolean(rows[0].maintenance_mode),
+        customerRegistrationEnabled: Boolean(rows[0].customer_registration_enabled),
+        contactFormEnabled: Boolean(rows[0].contact_form_enabled),
+        storefrontVisible: Boolean(rows[0].storefront_visible),
+        checkoutEnabled: Boolean(rows[0].checkout_enabled),
+        orderAcceptanceEnabled: Boolean(rows[0].order_acceptance_enabled),
+        customerLoginEnabled: Boolean(rows[0].customer_login_enabled),
+        wishlistEnabled: Boolean(rows[0].wishlist_enabled),
+        couponSystemEnabled: Boolean(rows[0].coupon_system_enabled),
+        productReviewsEnabled: Boolean(rows[0].product_reviews_enabled),
+        orderTrackingEnabled: Boolean(rows[0].order_tracking_enabled),
+        inventoryManagementEnabled: Boolean(rows[0].inventory_management_enabled),
+        updatedAt: new Date(rows[0].updated_at).toISOString(),
+      };
+    }
+
+    const st = await this.getFileState();
+    st.appSettings = { ...DEFAULT_APP_SETTINGS, ...data, updatedAt };
+    await this.persistFileState();
+    return st.appSettings;
   }
 
   // ==================== ORDERS (TRANSACTIONAL) ====================
@@ -1528,7 +1746,7 @@ class StorageEngine {
       };
     }
 
-    const [categories, products, deliverySettings, orders, banners, siteContent, contactMessages] =
+    const [categories, products, deliverySettings, orders, banners, siteContent, contactMessages, appSettings] =
       await Promise.all([
         this.listCategories(true),
         this.listProducts(true),
@@ -1537,8 +1755,17 @@ class StorageEngine {
         this.listBanners(true),
         this.getSiteContent(),
         this.listContactMessages(),
+        this.getAppSettings(),
       ]);
     const { rows: userRows } = await this.pgPool.query('SELECT * FROM users');
+    const { rows: wishlistRows } = await this.pgPool.query(
+      'SELECT user_id, product_id, created_at FROM customer_wishlist'
+    );
+    const wishlistItems: WishlistItemRecord[] = wishlistRows.map((r) => ({
+      userId: String(r.user_id),
+      productId: String(r.product_id),
+      createdAt: new Date(r.created_at).toISOString(),
+    }));
     let pluginIntegrations: PluginIntegrationRecord[] = [];
     let pluginActivityLogs: PluginActivityLogRecord[] = [];
 
@@ -1567,8 +1794,10 @@ class StorageEngine {
       banners,
       siteContent,
       contactMessages,
+      appSettings,
       pluginIntegrations,
       pluginActivityLogs,
+      wishlistItems,
     };
   }
 
@@ -1645,12 +1874,35 @@ class StorageEngine {
         categories: snapshot.categories,
         products: snapshot.products,
         deliverySettings: snapshot.deliverySettings || current.deliverySettings,
+        appSettings: snapshot.appSettings
+          ? { ...DEFAULT_APP_SETTINGS, ...snapshot.appSettings }
+          : (current.appSettings || { ...DEFAULT_APP_SETTINGS }),
         orders: snapshot.orders,
         banners: snapshot.banners,
         siteContent: snapshot.siteContent,
         contactMessages: current.contactMessages || [],
         pluginIntegrations: current.pluginIntegrations || [],
         pluginActivityLogs: current.pluginActivityLogs || [],
+        wishlistItems: (snapshot.wishlistItems || []).flatMap((item) => {
+          const backupUser = snapshot.users.find((u) => u.id === item.userId);
+          const currentUser = backupUser
+            ? current.users.find((u) => u.email.toLowerCase() === backupUser.email.toLowerCase())
+            : undefined;
+
+          if (
+            !backupUser ||
+            backupUser.role !== 'customer' ||
+            !currentUser ||
+            currentUser.role !== 'customer' ||
+            !productIds.has(item.productId)
+          ) return [];
+
+          return [{
+            userId: currentUser.id,
+            productId: item.productId,
+            createdAt: item.createdAt || new Date().toISOString(),
+          }];
+        }),
       };
       await this.persistFileState();
       return;
@@ -1714,6 +1966,7 @@ class StorageEngine {
 
       // Remove dependent store records in FK-safe order.
       await client.query('DELETE FROM orders');
+      await client.query('DELETE FROM customer_wishlist');
       await client.query('DELETE FROM products');
       await client.query('DELETE FROM categories');
       await client.query('DELETE FROM promotional_banners');
@@ -1793,6 +2046,23 @@ class StorageEngine {
         );
 
         productMap.set(product.id, result.rows[0].id);
+      }
+
+      // Restore customer wishlists using fresh user and product UUIDs.
+      for (const item of (snapshot.wishlistItems || [])) {
+        const backupUser = snapshot.users.find((u) => u.id === item.userId);
+        if (!backupUser || backupUser.role !== 'customer') continue;
+
+        const userId = userMap.get(item.userId);
+        const productId = productMap.get(item.productId);
+        if (!userId || !productId) continue;
+
+        await client.query(
+          `INSERT INTO customer_wishlist (user_id, product_id, created_at)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (user_id, product_id) DO NOTHING`,
+          [userId, productId, item.createdAt || new Date().toISOString()]
+        );
       }
 
       // Restore orders, items and notifications with fresh UUIDs.
@@ -1942,6 +2212,36 @@ class StorageEngine {
             item.valueEn || '',
             item.valueBn || '',
             item.updatedAt || new Date().toISOString(),
+          ]
+        );
+      }
+
+      // Restore app settings only when the backup contains them.
+      // Older backups must not overwrite the current settings.
+      if (snapshot.appSettings) {
+        await client.query(
+          `INSERT INTO app_settings
+            (id, maintenance_mode, customer_registration_enabled, contact_form_enabled,
+             storefront_visible, checkout_enabled, order_acceptance_enabled, customer_login_enabled, updated_at)
+           VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (id) DO UPDATE SET
+             maintenance_mode = EXCLUDED.maintenance_mode,
+             customer_registration_enabled = EXCLUDED.customer_registration_enabled,
+             contact_form_enabled = EXCLUDED.contact_form_enabled,
+             storefront_visible = EXCLUDED.storefront_visible,
+             checkout_enabled = EXCLUDED.checkout_enabled,
+             order_acceptance_enabled = EXCLUDED.order_acceptance_enabled,
+             customer_login_enabled = EXCLUDED.customer_login_enabled,
+             updated_at = EXCLUDED.updated_at`,
+          [
+            snapshot.appSettings.maintenanceMode,
+            snapshot.appSettings.customerRegistrationEnabled,
+            snapshot.appSettings.contactFormEnabled,
+            snapshot.appSettings.storefrontVisible ?? true,
+            snapshot.appSettings.checkoutEnabled ?? true,
+            snapshot.appSettings.orderAcceptanceEnabled ?? true,
+            snapshot.appSettings.customerLoginEnabled ?? true,
+            snapshot.appSettings.updatedAt || new Date().toISOString(),
           ]
         );
       }

@@ -20,3 +20,8 @@ data-temp/
 *.before-*
 *.division-backup
 main
+
+# Private backups - never upload
+private-backups/
+*.backup-*
+*.backup-home-cms
