@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NUSAIFA SPICES</string>
+    <string name="title_activity_main">NUSAIFA SPICES</string>
+    <string name="package_name">com.nusaifaspices.app</string>
+    <string name="custom_url_scheme">com.nusaifaspices.app</string>
+</resources>

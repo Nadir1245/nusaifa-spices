@@ -19,7 +19,6 @@ data-temp/
 *.bak*
 *.before-*
 *.division-backup
-main
 
 # Private backups - never upload
 private-backups/
