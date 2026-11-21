@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import express from 'express';
 import multer from 'multer';
+import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 import {
   attachOptionalAuth,
@@ -526,6 +527,40 @@ async function bootstrapServer() {
         subject: parsed.data.subject,
         message: parsed.data.message,
       });
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT || 465),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: `"NUSAIFA SPICES" <${process.env.SMTP_USER}>`,
+          to: process.env.CONTACT_NOTIFICATION_EMAIL || process.env.SMTP_USER,
+          replyTo: parsed.data.email || undefined,
+          subject: `New Contact Message: ${parsed.data.subject}`,
+          text: [
+            'New message received from NUSAIFA SPICES website.',
+            '',
+            `Name: ${parsed.data.name}`,
+            `Phone: ${parsed.data.phone}`,
+            `Email: ${parsed.data.email || 'Not provided'}`,
+            `Subject: ${parsed.data.subject}`,
+            '',
+            'Message:',
+            parsed.data.message,
+          ].join('\\n'),
+        });
+
+        console.log('Contact notification email sent successfully.');
+      } catch (emailError) {
+        console.error('Contact notification email failed:', emailError);
+      }
+
       res.status(201).json(saved);
     } catch {
       res.status(500).json({ error: 'Failed to submit inquiry.' });

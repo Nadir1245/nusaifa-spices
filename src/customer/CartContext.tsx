@@ -16,7 +16,7 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = 'nusaifa_spices_cart_v1';
 
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CartProvider: React.FC<{ children: React.ReactNode; products: Product[] }> = ({ children, products }) => {
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -36,6 +36,37 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [items]);
 
   const addToCart = (productId: string, quantity = 1) => {
+    const product = products.find((p) => p.id === productId);
+
+    if (product && typeof window !== 'undefined') {
+      const unitPrice =
+        product.discountPriceBdt !== null && product.discountPriceBdt < product.priceBdt
+          ? product.discountPriceBdt
+          : product.priceBdt;
+
+      const win = window as Window & {
+        dataLayer?: Array<Record<string, unknown>>;
+      };
+
+      win.dataLayer = win.dataLayer || [];
+      win.dataLayer.push({ ecommerce: null });
+      win.dataLayer.push({
+        event: 'add_to_cart',
+        ecommerce: {
+          currency: 'BDT',
+          value: unitPrice * quantity,
+          items: [{
+            item_id: product.sku || product.id,
+            item_name: product.nameEn,
+            item_brand: 'NUSAIFA SPICES',
+            item_variant: product.weightLabel,
+            price: unitPrice,
+            quantity,
+          }],
+        },
+      });
+    }
+
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.productId === productId);
       if (idx >= 0) {

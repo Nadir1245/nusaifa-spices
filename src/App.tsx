@@ -152,7 +152,7 @@ export default function App() {
   }
 
   return (
-    <CartProvider>
+    <CartProvider products={products}>
       <CustomerApp
         lang={lang}
         onToggleLang={toggleLang}
