@@ -107,6 +107,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [showAnnouncement, setShowAnnouncement] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
 
   useEffect(() => {
     if (!publicSettings.wishlistEnabled || !user || user.role !== 'customer') {
@@ -132,7 +133,11 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     ? announcementItem?.backgroundColorBn ?? '#075B42'
     : announcementItem?.backgroundColorEn ?? '#075B42';
 
-  const primaryBanner = banners[0] || {
+  const activeBanners = banners
+    .filter((banner) => banner.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const fallbackBanner = {
     id: 'fallback',
     titleEn: 'Quality Products from Trusted Brands',
     titleBn: 'বিশ্বস্ত ব্র্যান্ডের মানসম্মত পণ্য',
@@ -148,6 +153,19 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     sortOrder: 1,
     createdAt: '',
   };
+
+  const primaryBanner =
+    activeBanners[activeBannerIndex % (activeBanners.length || 1)] || fallbackBanner;
+
+  useEffect(() => {
+    if (activeBanners.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setActiveBannerIndex((current) => (current + 1) % activeBanners.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [activeBanners.length]);
 
   const filteredProducts = useMemo(() => {
     const activeCat = categories.find((c) => c.slug === activeCatSlug);
@@ -425,73 +443,117 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       <main className="flex-1">
         {route === 'home' && (
           <>
-            {/* Section 1: Editorial Hero */}
+            {/* Section 1: Premium Promotional Slider */}
             <section className="bg-[#F8F6F1] border-b border-[#E5E0D5]">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
-                <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
-                  <div className="text-xs font-semibold tracking-widest uppercase text-[#8E6F16]">
-                    {lang === 'bn'
-                      ? (siteContent.find((item) => item.key === 'homepage_tagline')?.valueBn || 'প্রাকৃতিক মসলা · অর্গানিক খাদ্য · ভেষজ সংগ্রহ')
-                      : (siteContent.find((item) => item.key === 'homepage_tagline')?.valueEn || 'Natural Spices · Organic Food · Herbal Wellness')}
-                  </div>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-10">
+                <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl bg-[#063D2E] border border-[#B99A4A]/40 shadow-xl">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#075B42] via-[#064431] to-[#10291F]" />
 
-                  <h1 className="text-4xl sm:text-5xl font-semibold text-[#141A17] leading-[1.1] text-balance">
-                    {lang === 'bn' ? primaryBanner.titleBn : primaryBanner.titleEn}
-                  </h1>
+                  <div className="relative grid grid-cols-1 lg:grid-cols-2 min-h-[440px] lg:min-h-[480px]">
+                    <div className="relative z-10 flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
+                      <div className="inline-flex items-center gap-2 text-[#E6C875] text-[11px] sm:text-xs font-bold tracking-[0.2em] uppercase mb-6">
+                        <span className="w-7 h-px bg-[#D7B65B]" />
+                        NUSAIFA SPICES
+                        <span className="w-7 h-px bg-[#D7B65B]" />
+                      </div>
 
-                  <p className="text-base text-[#4B5651] leading-relaxed max-w-lg">
-                    {lang === 'bn' ? primaryBanner.subtitleBn : primaryBanner.subtitleEn}
-                  </p>
+                      <h1
+                        key={primaryBanner.id + '-' + lang}
+                        className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-white leading-[1.2] text-balance"
+                      >
+                        {lang === 'bn' ? primaryBanner.titleBn : primaryBanner.titleEn}
+                      </h1>
 
-                  <div className="pt-2 flex flex-wrap items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={() => scrollToCatalog(primaryBanner.targetCategorySlug || 'all')}
-                      className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#075B42] text-white text-sm font-semibold hover:bg-[#054431] transition-colors"
-                    >
-                      <span>
-                        {lang === 'bn' ? primaryBanner.ctaLabelBn : primaryBanner.ctaLabelEn}
-                      </span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                      <p className="mt-5 text-sm sm:text-base text-white/80 leading-relaxed max-w-lg">
+                        {lang === 'bn' ? primaryBanner.subtitleBn : primaryBanner.subtitleEn}
+                      </p>
 
-                    <button
-                      type="button"
-                      onClick={() => goRoute('track')}
-                      className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl border border-[#D6D0C4] bg-white text-sm font-semibold text-[#141A17] hover:border-[#075B42] transition-colors"
-                    >
-                      {t(lang, 'navTrack')}
-                    </button>
-                  </div>
-                </div>
+                      <div className="mt-8 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => scrollToCatalog(primaryBanner.targetCategorySlug || 'all')}
+                          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#D7B65B] text-[#17251C] text-sm font-bold hover:bg-[#E8CB7D] transition-colors shadow-lg"
+                        >
+                          <span>
+                            {lang === 'bn' ? primaryBanner.ctaLabelBn : primaryBanner.ctaLabelEn}
+                          </span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
 
-                <div className="lg:col-span-7">
-                  <div className="nusaifa-product-stage relative min-h-[390px] lg:min-h-[420px] rounded-2xl overflow-hidden border border-[#E5E0D5]">
-                    <div className="nusaifa-stage-glow" aria-hidden="true" />
+                        <button
+                          type="button"
+                          onClick={() => goRoute('track')}
+                          className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl border border-white/30 bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors"
+                        >
+                          {t(lang, 'navTrack')}
+                        </button>
+                      </div>
 
-                    <div className="nusaifa-product-card nusaifa-float-1">
-                      <img src="/products/product_sundarban_honey_1794680615767.jpg" alt="Sundarban Honey" />
-                      <span>{lang === 'bn' ? 'সুন্দরবনের মধু' : 'Sundarban Honey'}</span>
+                      {activeBanners.length > 1 && (
+                        <div className="flex items-center gap-2 mt-9" aria-label="Slider indicators">
+                          {activeBanners.map((banner, index) => (
+                            <button
+                              key={banner.id}
+                              type="button"
+                              onClick={() => setActiveBannerIndex(index)}
+                              aria-label={`Go to slide ${index + 1}`}
+                              aria-current={index === activeBannerIndex ? 'true' : undefined}
+                              className={`h-2.5 rounded-full transition-all ${
+                                index === activeBannerIndex
+                                  ? 'w-8 bg-[#D7B65B]'
+                                  : 'w-2.5 bg-white/40 hover:bg-white/70'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="nusaifa-product-card nusaifa-float-2">
-                      <img src="/products/product_moringa_superfood_1794680617098.jpg" alt="Moringa Powder" />
-                      <span>{lang === 'bn' ? 'মরিঙ্গা পাউডার' : 'Moringa Powder'}</span>
-                    </div>
+                    <div className="relative min-h-[260px] sm:min-h-[340px] lg:min-h-full p-4 sm:p-6 lg:p-8">
+                      <div className="absolute inset-4 sm:inset-6 lg:inset-8 rounded-2xl overflow-hidden border border-[#D7B65B]/40 bg-[#173F31]">
+                        {primaryBanner.imageUrl ? (
+                          <img
+                            key={primaryBanner.id}
+                            src={primaryBanner.imageUrl}
+                            alt={lang === 'bn' ? primaryBanner.titleBn : primaryBanner.titleEn}
+                            className="w-full h-full min-h-[260px] sm:min-h-[340px] lg:min-h-[400px] object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full min-h-[260px] flex items-center justify-center text-[#D7B65B] text-2xl font-semibold">
+                            NUSAIFA SPICES
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#071E16]/35 via-transparent to-transparent pointer-events-none" />
+                      </div>
 
-                    <div className="nusaifa-product-card nusaifa-float-3">
-                      <img src="/products/product_turmeric_powder_1794680615609.jpg" alt="Turmeric Powder" />
-                      <span>{lang === 'bn' ? 'হলুদ গুঁড়া' : 'Turmeric Powder'}</span>
-                    </div>
-
-                    <div className="nusaifa-product-card nusaifa-float-4">
-                      <img src="/products/product_black_seed_oil_1794680616988.jpg" alt="Black Seed Oil" />
-                      <span>{lang === 'bn' ? 'কালোজিরার তেল' : 'Black Seed Oil'}</span>
-                    </div>
-
-                    <div className="nusaifa-product-card nusaifa-float-5">
-                      <img src="/products/product_garam_masala_1794680617882.jpg" alt="Garam Masala" />
-                      <span>{lang === 'bn' ? 'গরম মসলা' : 'Garam Masala'}</span>
+                      {activeBanners.length > 1 && (
+                        <div className="absolute bottom-8 right-8 sm:bottom-10 sm:right-10 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveBannerIndex((current) =>
+                                (current - 1 + activeBanners.length) % activeBanners.length
+                              )
+                            }
+                            aria-label="Previous banner"
+                            className="w-10 h-10 rounded-full bg-[#F8F6F1] text-[#075B42] flex items-center justify-center shadow-lg hover:bg-[#D7B65B] transition-colors"
+                          >
+                            <span aria-hidden="true">←</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveBannerIndex((current) =>
+                                (current + 1) % activeBanners.length
+                              )
+                            }
+                            aria-label="Next banner"
+                            className="w-10 h-10 rounded-full bg-[#F8F6F1] text-[#075B42] flex items-center justify-center shadow-lg hover:bg-[#D7B65B] transition-colors"
+                          >
+                            <span aria-hidden="true">→</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
