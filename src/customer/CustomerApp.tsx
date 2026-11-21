@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  House,
+  LayoutGrid,
+  MessageCircle,
+  UserRound,
   Menu,
   Minus,
   Plus,
@@ -238,7 +242,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-[#141A17]">
+    <div className="min-h-screen flex flex-col bg-white text-[#141A17] pb-20 md:pb-0">
       {/* Slim Dismissible Announcement Bar (<= 36px) */}
       {showAnnouncement && (
         <div className="text-xs h-9 px-4 flex items-center justify-between gap-4" style={{ color: announcementTextColor, backgroundColor: announcementBackgroundColor }}>
@@ -975,6 +979,83 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
           <span>Mirwarispur, Begumganj, Chowmuhani, Noakhali 3823, Bangladesh</span>
         </div>
       </footer>
+
+      {/* Mobile Bottom Navigation */}
+      <nav
+        aria-label={lang === 'bn' ? 'মোবাইল নেভিগেশন' : 'Mobile navigation'}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[#E5E0D5] bg-white/95 backdrop-blur-md shadow-[0_-4px_18px_rgba(0,0,0,0.07)] pb-[env(safe-area-inset-bottom)]"
+      >
+        <div className="max-w-xl mx-auto grid grid-cols-5">
+          <button
+            type="button"
+            onClick={() => goRoute('home')}
+            aria-label={lang === 'bn' ? 'হোম' : 'Home'}
+            className={`min-h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors ${
+              route === 'home' ? 'text-[#075B42]' : 'text-[#68736D] hover:text-[#075B42]'
+            }`}
+          >
+            <House className="w-5 h-5" />
+            <span>{lang === 'bn' ? 'হোম' : 'Home'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              scrollToCatalog('all');
+            }}
+            aria-label={lang === 'bn' ? 'ক্যাটাগরি' : 'Categories'}
+            className="min-h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold text-[#68736D] hover:text-[#075B42] transition-colors"
+          >
+            <LayoutGrid className="w-5 h-5" />
+            <span>{lang === 'bn' ? 'ক্যাটাগরি' : 'Categories'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => goRoute('contact')}
+            aria-label={lang === 'bn' ? 'যোগাযোগ' : 'Message'}
+            className={`min-h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors ${
+              route === 'contact' ? 'text-[#075B42]' : 'text-[#68736D] hover:text-[#075B42]'
+            }`}
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span>{lang === 'bn' ? 'মেসেজ' : 'Message'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setDrawerOpen(true);
+            }}
+            aria-label={lang === 'bn' ? 'কার্ট' : 'Cart'}
+            className="min-h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold text-[#68736D] hover:text-[#075B42] transition-colors"
+          >
+            <span className="relative">
+              <ShoppingBag className="w-5 h-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-[#C49A45] text-white text-[9px] flex items-center justify-center">
+                  {totalItems > 99 ? '99+' : totalItems}
+                </span>
+              )}
+            </span>
+            <span>{lang === 'bn' ? 'কার্ট' : 'Cart'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => goRoute('account')}
+            aria-label={lang === 'bn' ? 'অ্যাকাউন্ট' : 'Account'}
+            className={`min-h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors ${
+              route === 'account' ? 'text-[#075B42]' : 'text-[#68736D] hover:text-[#075B42]'
+            }`}
+          >
+            <UserRound className="w-5 h-5" />
+            <span>{lang === 'bn' ? 'অ্যাকাউন্ট' : 'Account'}</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };
