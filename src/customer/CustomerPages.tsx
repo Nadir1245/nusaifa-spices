@@ -37,6 +37,37 @@ export const ProductDetailView: React.FC<{
   const [qty, setQty] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const unitPrice =
+      product.discountPriceBdt !== null && product.discountPriceBdt < product.priceBdt
+        ? product.discountPriceBdt
+        : product.priceBdt;
+
+    const win = window as Window & {
+      dataLayer?: Array<Record<string, unknown>>;
+    };
+
+    win.dataLayer = win.dataLayer || [];
+    win.dataLayer.push({ ecommerce: null });
+    win.dataLayer.push({
+      event: 'view_item',
+      ecommerce: {
+        currency: 'BDT',
+        value: unitPrice,
+        items: [{
+          item_id: product.sku || product.id,
+          item_name: product.nameEn,
+          item_brand: 'NUSAIFA SPICES',
+          item_variant: product.weightLabel,
+          price: unitPrice,
+          quantity: 1,
+        }],
+      },
+    });
+  }, [product]);
+
   const hasDiscount =
     product.discountPriceBdt !== null && product.discountPriceBdt < product.priceBdt;
   const activePrice = hasDiscount ? product.discountPriceBdt! : product.priceBdt;
