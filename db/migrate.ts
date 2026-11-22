@@ -29,11 +29,13 @@ async function runMigrations() {
   const pool = connectionString
     ? new Pool({
         connectionString,
+        connectionTimeoutMillis: 15000,
         ssl: process.env.PGSSL === 'true'
           ? { rejectUnauthorized: false }
           : false,
       })
     : new Pool({
+        connectionTimeoutMillis: 15000,
         host: process.env.PGHOST || 'localhost',
         port: Number(process.env.PGPORT || 5432),
         database: process.env.PGDATABASE || 'nusaifa_spices',
@@ -44,7 +46,9 @@ async function runMigrations() {
           : false,
       });
 
+  console.log('Connecting to PostgreSQL database...');
   const client = await pool.connect();
+  console.log('PostgreSQL connection established.');
   let lockAcquired = false;
 
   try {
