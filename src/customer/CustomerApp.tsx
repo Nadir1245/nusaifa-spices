@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   House,
@@ -108,6 +108,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     if (!publicSettings.wishlistEnabled || !user || user.role !== 'customer') {
@@ -446,10 +447,31 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
             {/* Section 1: Premium Promotional Slider */}
             <section className="bg-[#F8F6F1] border-b border-[#E5E0D5]">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-10">
-                <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl bg-[#063D2E] border border-[#B99A4A]/40 shadow-xl">
+                <div
+                  className="relative overflow-hidden rounded-2xl lg:rounded-3xl bg-[#063D2E] border border-[#B99A4A]/40 shadow-xl"
+                  style={{ touchAction: 'pan-y' }}
+                  onTouchStart={(event) => {
+                    touchStartX.current = event.touches[0]?.clientX ?? null;
+                  }}
+                  onTouchEnd={(event) => {
+                    const startX = touchStartX.current;
+                    const endX = event.changedTouches[0]?.clientX;
+                    touchStartX.current = null;
+
+                    if (startX === null || endX === undefined) return;
+                    const distance = endX - startX;
+                    if (Math.abs(distance) < 50 || activeBanners.length <= 1) return;
+
+                    setActiveBannerIndex((current) =>
+                      distance < 0
+                        ? (current + 1) % activeBanners.length
+                        : (current - 1 + activeBanners.length) % activeBanners.length
+                    );
+                  }}
+                >
                   <div className="absolute inset-0 bg-gradient-to-br from-[#075B42] via-[#064431] to-[#10291F]" />
 
-                  <div className="relative grid grid-cols-1 lg:grid-cols-2 min-h-[440px] lg:min-h-[480px]">
+                  <div className="relative flex flex-col">
                     <div className="relative z-10 flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
                       <div className="inline-flex items-center gap-2 text-[#E6C875] text-[11px] sm:text-xs font-bold tracking-[0.2em] uppercase mb-6">
                         <span className="w-7 h-px bg-[#D7B65B]" />
@@ -509,7 +531,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
                       )}
                     </div>
 
-                    <div className="relative min-h-[260px] sm:min-h-[340px] lg:min-h-full p-4 sm:p-6 lg:p-8">
+                    <div className="relative min-h-[280px] sm:min-h-[380px] lg:min-h-[480px] p-4 sm:p-6 lg:p-8">
                       <div className="absolute inset-4 sm:inset-6 lg:inset-8 rounded-2xl overflow-hidden border border-[#D7B65B]/40 bg-[#173F31]">
                         {primaryBanner.imageUrl ? (
                           <img
